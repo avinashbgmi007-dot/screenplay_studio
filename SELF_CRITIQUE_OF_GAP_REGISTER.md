@@ -3370,3 +3370,60 @@ Recorded as not done: the filing's timing and quality observations (0.3 s analyz
 what the stand-in model is, and no claim about a real model follows from them. Gap
 87, the adjacent desk-text-vs-markdown half, was left open; this gap made the
 markdown agree with the desk rather than closing its neighbour by implication.
+
+## §81 — Gap 98: one rule made two opposite mistakes (2026-11-06)
+
+`classify_turn` looked at the first token and a trailing "?". That single rule
+produced both halves of this gap, and they point in opposite directions:
+
+- a stated decision — *"Let the silence sit."*, *"I want the audience to feel
+  compulsion."* — was a bare `idea`, so `should_probe` fired and Sameer asked
+  "why do you think so?" of a writer who had just said what they wanted;
+- a proposal about the writer's own draft — *"Could I lose the last beat?"* — was a
+  `question`, so it got the answer-first treatment reserved for fact questions.
+
+One is over-attention, the other under-attention, and both come from trusting
+surface form. The fix is therefore classification, not another exception in
+`should_probe` — which stays a single line, and that is the evidence the change is
+in the right layer.
+
+Each new kind carries a **behaviour**, because a label nobody reads is a comment.
+`intent` forbids the interrogation explicitly; `request` forbids treating a
+proposal as a fact question. Both now live in `peer.opening_contract()`, which the
+engine calls, and which replaces an inline string that used to sit in the engine —
+so a future kind cannot be added without someone deciding what the reply does
+first, and the contract is testable without a model call.
+
+**The boundaries are the part I am most confident about, and they are narrower
+than the filing's recommendation.** The entry suggests adding patterns for "let",
+"I want", "I'd like", "keep", "allow" — which I did — and "treat modal+verb as a
+request", which I did **not** do in general. Two limits:
+
+* *"Mara should die at the end"* stays a probeable **idea**. Two pre-existing tests
+  pin it, and on reflection they are right: a plot decision is exactly the thing a
+  co-writer should help think through. So the `should` rule is not "a statement
+  containing should", it is **effect-vs-event** — *how the work should FEEL* is an
+  intention, *what should HAPPEN* is an idea.
+* *"Can the mother appear earlier?"* stays a **question**. The filing's
+  "modal+verb" rule would have swept it into `request`; the first-person constraint
+  is what separates a proposal about my own draft from a request for a judgment.
+
+Implementing the recommendation literally would have broken a correct existing test
+and mis-classified a genuine question. The recommendation is a description of the
+symptom; the boundary is the actual finding.
+
+Three of my patches silently failed on the first attempt — the engine edit, the
+contraction branch (`I've decided`), and `let us`. Each was caught by a test written
+before the code, not by re-reading the diff. And one revert (R6) **passed when it
+should have failed**: my mutation kept `opening_contract(turn_kind)` but wrapped it
+in `if turn_kind == "question"`, so the shared function was still called and then
+thrown away for the two new kinds. The pin now asserts the assignment shape
+verbatim. That is the same lesson as gap 73 and gap 85 — a test that names the right
+symbol can still be blind to whether the symbol's result is used.
+
+Recorded as not done, and it is the significant one: **this is a pattern table over
+English.** The writer's Telugu and Tenglish turns — *"Ammaki cheppakunda
+vellipothadu"* — are intentions this classifier will still read as ideas and probe.
+The brief's rule holds for those turns regardless of language; the mechanism does
+not. Routing non-English turns away from the probe is the honest fix, not more
+regex, and that is a different gap.

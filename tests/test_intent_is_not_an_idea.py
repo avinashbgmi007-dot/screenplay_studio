@@ -161,6 +161,16 @@ def test_the_engine_uses_the_shared_contract_not_an_inline_copy():
     assert "ANSWER FIRST: the writer asked a direct question" not in engine, (
         "the contract is duplicated inline again — one statement, in peer.py")
 
+    # And the contract must reach the model for EVERY kind, not just questions.
+    # Measured: my first revert reintroduced `... if turn_kind == "question" else ""`
+    # and every test here still passed, because the shared function was still
+    # called — it was called and then thrown away for the new kinds. Pin the
+    # assignment shape, since the alternative is booting the engine with a fake
+    # client to observe a prompt string.
+    line = [ln.strip() for ln in engine.splitlines() if "answer_first =" in ln]
+    assert line == ["answer_first = opening_contract(turn_kind)"], (
+        f"the engine derails the contract instead of using it verbatim: {line}")
+
 
 def test_a_request_gets_no_forward_nudge():
     """They asked us something; tacking "want me to run with this?" onto the

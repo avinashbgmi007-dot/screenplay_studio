@@ -151,7 +151,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 95 | **D** | Route reachability | Design lab is a deliberate shipping decision. | **G** |
 | 96 | **D** | Filename serving | Dead labs; housekeeping. | **G** |
 | 97 | **D** | — | A design proposal for a recovery room, not a reproduced defect. | **P** |
-| 98 | **A** | Real intent classifiers, writer's own phrasings | A statement of intent classified as a bare idea. | **G** |
+| 98 | **A** | The real `classify_turn` / `should_probe` over the filing's own phrasing, plus the engine's contract injection | Stated intentions classified `idea` and probed; modal first-person proposals classified `question` — reproduced exactly. **FIXED 2026-11-06.** New `intent` and `request` kinds with behaviour (opening contracts in `peer.opening_contract`, no nudge for a request); `should_probe` stays one line because the classification carries the rule. Boundaries kept deliberately: plot decisions stay probeable ideas (effect-vs-event), third-person modals stay questions. Reverts: **9 / 4 / 17 / 2 / 1 / 1 / 2**. 33 tests. Critique S81. Not done: the table is English-only (no Telugu/Tenglish coverage — "Ammaki cheppakunda vellipothadu" still reads as an idea); `has_embedded_reasoning` and `intent` are two paths to the same outcome and could drift. | **F** |
 | 99 | **C** | Prompt text read | The safety contract lives only in prompt text. | **G** |
 | 100 | **C** | `craft_history` source | Only still-applied edits are citable. | **G** |
 | 101 | **B** | Substring rules traced and exercised | Persona-visible behaviour decided by `has_embedded…`-style rules. | **G** |
