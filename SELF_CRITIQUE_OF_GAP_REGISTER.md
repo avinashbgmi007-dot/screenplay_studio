@@ -3788,3 +3788,44 @@ tier disagreement, absent related-rule ids, requirement/input mismatch — and a
 three are judgements about *editorial intent* in the KB, not behaviour I can
 verify from code. Picking tiers myself would replace a known inconsistency with
 an unknown authority. They stay open, named, with a reason.
+
+## §89 — Gap 12: the obvious fix was the worse bug, and the suite said so in one run (2026-11-08)
+
+**Reverts: 5 / 7 / 2 / 1 / 4.** 10 unit tests, 4 HTTP tests.
+
+The collision is real and I reproduced it exactly: two findings, same category,
+same quote, same scene, **opposite** claims — both `fyrjq3y`. One verdict
+answered both. The writer could not call one wrong without calling the other
+wrong.
+
+**The obvious fix was wrong, and I want that recorded rather than tidied
+away.** Folding the claim into `compute_finding_id` distinguishes the two rows
+immediately — and broke three pre-existing tests asserting that a quoted
+finding's id **survives the model re-wording its `issue`**. That property is not
+incidental: the model rewords constantly, and the id is what keeps a verdict
+attached across a re-analysis. Re-keying on prose would orphan every mark on
+every run to fix a collision that affects two rows in one report. I reverted my
+attempt instead of adjusting the tests to it, because the tests were right and I
+was about to trade a rare defect for a universal one.
+
+So the fix is conditional: ids unchanged; a store key is claim-scoped **only**
+where the report actually collides; a legacy bare-id verdict on a colliding pair
+is shown as a question. Three states, none of them a guess.
+
+Two of my own bugs, both found here rather than by me:
+
+- The first `resolve_verdict` returned `(None, None)` for a legacy bare verdict
+  on a collision — **silently dropping** the judgment, in the exact function
+  whose docstring I had just written to say it must never be discarded. My own
+  probe caught it, not a test I had written.
+- The server helper wrapped its whole body in a bare `except Exception`. A
+  `NameError` (a function imported only inside the sibling route) surfaced as
+  **"no collisions"** — indistinguishable from the healthy case, so the feature
+  would have looked fine and served nothing. Narrowed the catch to the report
+  read. This is the same permissive-failure inversion §84 names; I walked into it
+  in the same turn I was quoting it.
+
+**Left open, deliberately:** the same-mtime report-signature probe in this
+entry's second half. A report's signature is a cache key, and changing what goes
+into it changes cache validity everywhere; that deserves its own gap with its
+own blast-radius check, not a paragraph appended to this one.
