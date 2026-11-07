@@ -3641,3 +3641,61 @@ same run lock answers it. What is still true, and stated rather than glossed:
 reports remain one live set per project, not one per draft, so a reading of an
 older draft is *refused* rather than kept and labelled. That is a product
 decision (the C2 option), not a safety hole.
+
+## §86 — Gap 8: the codebase already knew, and the archive was outside the net (2026-11-08)
+
+**Reverts: 5 / 1 / 1 / 1 / 1 / 1.** 6 tests.
+
+The entry was graded at "the weaker half" because it held two claims. Measured,
+one of them was already closed: gap 72 had given both backup routes per-file
+omission accounting, an `X-Backup-Complete` header and a manifest inside the
+archive. So the incompleteness half needed verifying, not building.
+
+The credential half reproduced immediately: a project manifest holding
+`sk-live-...` came back in **both** the project archive and the library archive,
+verbatim, inside `project.json`.
+
+Two things about that are worth writing down.
+
+**The principle was already in the codebase and the backup was simply not in
+it.** `tests/test_privacy_statement.py` has a class called
+`TestTheSecretStillNeverLeaves`; it sweeps `/api/config` and `/api/health`. The
+archives were never in that sweep, so a surface whose whole purpose is to leave
+the machine was the one surface nobody had checked. When a product states a
+principle, the gap is usually in the list of places it was applied — not in the
+principle.
+
+**The key is supposed to be there.** `_adopt_connection` deliberately copies the
+token into every project manifest (gap 58) so `resume` and the CLI work without
+the writer retyping it. So "remove the key from `project.json`" would have been
+the wrong fix twice over: it breaks that design, and it puts the secret back in
+front of the writer on every run. The right question was narrower — *where is
+this file allowed to travel?* — and the answer is "the writer's own disk, not an
+archive that gets emailed". That is why the redaction lives in the backup route
+and nowhere else.
+
+The redaction is **structural, not a text scrub**: the manifest names its own
+secret field, so that field is cleared and every other byte is untouched.
+Matching a token's shape across arbitrary content would either miss a key it did
+not recognise or corrupt a script holding the same characters. The test that
+matters most is therefore not "the key is gone" but **"everything else survived"**
+— title, `server_url`, stages, drafts, source record. A redaction that quietly
+dropped those would trade a confidentiality bug for a restore bug, and on a
+backup availability is the entire point.
+
+And the omission is **named**, not merely absent: `X-Backup-Credentials` plus
+`credentials_withheld` in the embedded manifest. Deliberately a different header
+from `X-Backup-Complete`, because "your archive does not hold everything" and
+"your archive does not hold your API key" are different facts and the second is
+good news; folding them together would report a successful redaction as an
+incomplete backup.
+
+Process note against myself: I committed this change while ruff was reporting an
+`E713`, because I piped the check and the commit into one command and read only
+the last line. Amended within the same turn. The standing correction in this
+register is about not ending a turn red — committing past a lint failure is the
+same failure at a smaller scale, and it happened because I let a one-line output
+tail stand in for reading the result.
+
+Not claimed: an archive produced before this change still contains the token.
+Redaction cannot reach a file already on someone's disk, and the entry says so.
