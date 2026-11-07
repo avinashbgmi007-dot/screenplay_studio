@@ -90,6 +90,47 @@ _SUBTITLE_PATTERNS = [
 ]
 
 
+# --- Gap 11: the patterns above answer "does this text mention subtitles or
+# accessibility?", which is not the same question as "is this note ABOUT
+# language?". A craft note can mention a subtitle card while its subject is POV,
+# staging or character ("a subtitle card would explain the line to the audience
+# and explain nothing to him"), and the cheap patterns were silently deleting
+# those. These are the signals that the note is really about a viewer's ability
+# to follow the words. A subtitle mention now needs one of them.
+_ACCESSIBILITY_DEMAND = [
+    re.compile(r"\bneeds? (either )?(subtitles?|context|translation)", re.I),
+    re.compile(r"\b(requires?|requiring|with|without) (either )?(subtitles?|context|"
+               r"translation|an? english equivalent)", re.I),
+    re.compile(r"\bwithout\b[^.]{0,40}\b(subtitles?|translations?|"
+               r"english equivalent)\b", re.I),
+    re.compile(r"\b(subtitles?|translation|context) (is |are )?(needed|required|"
+               r"necessary)", re.I),
+    re.compile(r"\bfor non[- ]native (speakers?|viewers?|audiences?)", re.I),
+    re.compile(r"\b(viewers?|audiences?) (who|that) (don'?t|do not|won'?t) "
+               r"(speak|understand)", re.I),
+    re.compile(r"\b(untranslated|untransliterated)\b", re.I),
+    re.compile(r"\b(foreign|international|western) (viewer|audience)", re.I),
+    re.compile(r"\b(obscures|blocks|barrier to) (meaning|understanding)", re.I),
+    re.compile(r"\bmix(es|ed|ing) languages? without", re.I),
+]
+
+
+def _subtitle_noise(claim: str) -> bool:
+    """A subtitle/language reference that is what the note is *about*.
+
+    Deliberately narrower than `_matches_any(_SUBTITLE_PATTERNS)`: the bare
+    patterns include the word "subtitle" and phrases like "foreign audience",
+    which occur inside perfectly good craft notes. A mention only counts as
+    noise when the note also states an accessibility demand, OR when it
+    identifies the language outright (that is a language note wearing a
+    subtitle costume).
+    """
+    if not _matches_any(claim, _SUBTITLE_PATTERNS):
+        return False
+    return (_matches_any(claim, _ACCESSIBILITY_DEMAND)
+            or _matches_any(claim, _LANGUAGE_ID_PATTERNS))
+
+
 def _matches_any(text: str, patterns: list) -> bool:
     if not text:
         return False
@@ -112,10 +153,10 @@ def is_non_writing_feedback(finding: dict) -> bool:
     issue = str(finding.get("issue") or "")
     why = str(finding.get("why_it_matters") or "")
     combined = f"{issue} {why}"
-    if _matches_any(combined, _LANGUAGE_ID_PATTERNS) or _matches_any(combined, _SUBTITLE_PATTERNS):
+    if _matches_any(combined, _LANGUAGE_ID_PATTERNS) or _subtitle_noise(combined):
         return True
     obs = str(finding.get("observation") or "")
-    if ((_matches_any(obs, _LANGUAGE_ID_PATTERNS) or _matches_any(obs, _SUBTITLE_PATTERNS))
+    if ((_matches_any(obs, _LANGUAGE_ID_PATTERNS) or _subtitle_noise(f"{obs} {combined}"))
             and _matches_any(combined, _INCOMPREHENSION_PATTERNS)):
         return True
     return (_matches_any(combined, _REGISTER_LANG)
@@ -142,8 +183,17 @@ def partition_findings(findings) -> tuple[list, list]:
 
 
 # --- patterns where the observation rebuts the note (accuracy kit A) ---
+# `\bhowever\b` alone used to be a rebuttal. It is one of the most ordinary
+# words in English prose: "however brief the exchange is on the page" qualifies a
+# duration and contradicts nothing, yet it demoted a note's severity and stamped
+# it `contested`. A rebuttal needs the word AND a turn against the note - a
+# negation, a "the script does X instead", or an explicit accuracy claim.
 _CONTRADICTION_PATTERNS = [
-    re.compile(r"\bhowever\b", re.I),
+    # contrastive connector: "however," — the intensifier "however brief" never
+    # takes that comma, which is what separates the two uses.
+    re.compile(r"\bhowever\s*[,;:]", re.I),
+    re.compile(r"\bhowever\b[^.]{0,80}?\b(not|no|never|nothing|but|instead|"
+               r"actually|only|despite|rather)\b", re.I),
     re.compile(r"\bactually\b.{0,30}\b(not|no)\b", re.I),
     re.compile(r"\bcontradicts?\b", re.I),
     re.compile(r"\bno evidence\b", re.I),
