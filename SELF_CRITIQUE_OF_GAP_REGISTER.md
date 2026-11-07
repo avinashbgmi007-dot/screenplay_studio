@@ -3699,3 +3699,48 @@ tail stand in for reading the result.
 
 Not claimed: an archive produced before this change still contains the token.
 Redaction cannot reach a file already on someone's disk, and the entry says so.
+
+## §87 — Gap 10: one word carried two promises, and a third was never made (2026-11-08)
+
+**Reverts: 3 / 3 / 2 / 1 / 1 / 1.** 9 Python tests, 4 node tests.
+
+`status: "verified"` was emitted for a normalised exact hit **and** for a fuzzy
+match as loose as the 0.72 threshold. Those are different promises — "the script
+says this" and "the script says something this close" — and a writer could not
+tell them apart, nor could the desk, whose readout said "N of M quotes
+verified". The 0.95 near-identical boundary had already been added to stop one
+kind of paraphrase being certified; a coarser one sailed through.
+
+The larger half is the one with no code fix at all. **"Quote verified" answers a
+question about text, and the writer reads it as an answer about the claim.** A
+finding can quote a real line exactly and still be wrong about what it shows —
+which is the filed defect: a fabricated contradictory observation carried an
+exact, verified quote. So the report now says, in those words, that a verified
+citation means the text was found and does NOT mean the claim is supported, and
+tells the writer to judge the claim themselves.
+
+The temptation here was a `claim_supported: true|false` field. **I did not add
+one, deliberately.** Nothing in this pipeline reads the argument between the
+quote and the conclusion; there is no argument-level verifier. Any such boolean
+would be fabricated confidence — precisely the defect this gap is about, moved
+one level up and wearing better clothes. The honest fix for "we cannot assess
+this" is to say so, not to invent a verdict.
+
+Two errors of my own, both caught by the suite rather than by me:
+
+- I added `exact`/`approximate` **inside** the counts dict, which broke
+  `sum(verification_summary.values()) == len(findings)` — an invariant other
+  code and two tests rely on. The split is a second *view* of a subset of
+  `verified`, not more findings. It now lives in separate keys and the rule has
+  a name (`locating_total()`) instead of being re-derived in each reader.
+- **Seven pre-existing node tests pinned the phrase "quotes verified".** That
+  phrase was the defect, so I changed the wording — but only the wording: every
+  denominator, count and percentage gap 93 established is byte-identical, and
+  the tests were reworded rather than loosened. A wording change that quietly
+  drops a denominator is how gap 93's own bug came back the first time, so the
+  numbers were checked one by one rather than assumed to survive a `replace()`.
+
+Not claimed: nothing here makes the analysis better at *judging* findings. The
+gap closed is epistemic honesty — the surfaces no longer imply a check that does
+not exist. An argument-level verifier remains absent, and the register now says
+so in the entry rather than leaving a reader to infer otherwise.
