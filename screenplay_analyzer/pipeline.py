@@ -1892,6 +1892,17 @@ def analyze(
     # and the webapp, so no new plumbing is needed to surface it.
     result.stats = result.stats or {}
     result.stats["evidence_depth"] = evidence_depth(result.findings)
+    # Gap 11: how much craft grounding actually reached the model. The prompt
+    # already told the MODEL what was shed; nothing told the writer, who is the
+    # one reading "grounded in named craft principles" beside the findings.
+    # Recorded only when a fragment was actually capped — an uncapped run has
+    # nothing to disclose, and a "83 of 83" line would be noise on every report.
+    try:
+        grounding = rules_ctx.grounding_records()
+    except Exception:
+        grounding = {}
+    if grounding:
+        result.stats["kb_grounding"] = grounding
     if merged_away:
         result.stats["findings_merged"] = merged_away
 

@@ -230,7 +230,13 @@ class RulesContext:
 
     def _render_budgeted(self, rules: list, budget: int) -> str:
         """Keep whole rules, highest confidence tier first, until the budget is
-        reached — then state the omission in the prompt (never drop silently)."""
+        reached — then state the omission in the prompt (never drop silently).
+
+        Gap 11: it also RECORDS the omission. The model was always told in the
+        prompt, but the writer was not, and the writer is the one being handed
+        feedback that claims craft grounding. `grounding_records()` is what lets
+        the report say how many principles actually reached the model.
+        """
         ordered = sorted(rules, key=lambda r: _TIER_ORDER.get(
             getattr(r, "confidence_tier", "medium"), 1))
         kept: list = []
@@ -246,7 +252,34 @@ class RulesContext:
         if omitted:
             text += (f"\n\n({omitted} further craft principles {KB_OMISSION_MARKER} "
                      f"— the highest-confidence ones are kept.)")
+            ledger = getattr(self, "_grounding_ledger", None)
+            if ledger is None:
+                ledger = self._grounding_ledger = {}
+            prior = ledger.get("_totals", {"selected": 0, "supplied": 0})
+            ledger["_totals"] = {
+                "selected": prior["selected"] + len(rules),
+                "supplied": prior["supplied"] + len(kept),
+            }
         return text
+
+    def grounding_records(self) -> dict:
+        """How many selected craft principles actually reached the model.
+
+        Only fragments that were BUDGETED contribute — an uncapped fragment
+        supplies every rule it selected, so counting it would dilute the ratio
+        with passes that were never at risk. A pass that shed nothing is absent
+        by design: there is nothing to disclose.
+
+        Returns {} when nothing was ever capped, so callers never print a
+        "0 of 0" line that implies a starvation that did not happen.
+        """
+        totals = getattr(self, "_grounding_ledger", {}).get("_totals")
+        if not totals or not totals.get("selected"):
+            return {}
+        selected, supplied = totals["selected"], totals["supplied"]
+        return {"selected": selected, "supplied": supplied,
+                "omitted": selected - supplied,
+                "pct_supplied": round(100.0 * supplied / selected, 1)}
 
     # ---- public fragment API ---------------------------------------------
 

@@ -308,6 +308,24 @@ def render_markdown(result: AnalysisResult) -> str:
 
     # --- Analysis categories ---
     grouped = _findings_by_category(result.findings)
+    # Gap 11: how much craft grounding reached the model. The prompt always
+    # told the model what was shed; the writer was never told, and the writer
+    # is the one reading findings that cite craft principles. "18 of 30
+    # came from a summary" is a scope; this is the same kind of scope for
+    # the rules behind the feedback. Printed only when something was shed —
+    # a full-supply run has nothing to disclose.
+    kb = (result.stats or {}).get("kb_grounding") or {}
+    if kb.get("omitted"):
+        lines.append(
+            f"\n**Craft grounding:** of {kb['selected']} craft principles "
+            f"selected to ground this analysis, **{kb['supplied']} reached the "
+            f"model** and {kb['omitted']} were left out to fit the prompt "
+            f"budget ({kb.get('pct_supplied')}% supplied). The ones kept are the "
+            "highest-confidence tier, so a low-severity defect covered only by "
+            "a lower-tier principle may not have been looked for at all — "
+            "absence of a note is not proof the defect is absent. Raise "
+            "`SCREENPLAY_KB_BUDGET` to supply all of them."
+        )
     lines.append("## Detailed Analysis")
     # Gap 87: state the unsupported count where the list is printed, so a writer
     # scanning the report knows how much of what follows rests on nothing they
