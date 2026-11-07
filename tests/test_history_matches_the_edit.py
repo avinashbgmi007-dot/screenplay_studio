@@ -120,6 +120,38 @@ def test_a_failed_history_write_leaves_the_text_untouched(project, monkeypatch):
     assert revision.edits_log(project) == []
 
 
+def test_the_rollback_restores_the_exact_previous_text(project, monkeypatch):
+    """Clearing the flag is not the same as undoing the edit.
+
+    A refusal that leaves the new text in place and simply forgets the journal
+    would pass every test that only asks whether the interface agreed with
+    itself. The writer's document is the thing that has to go back.
+    """
+    before = _working_text(project)
+    _fail_log_writes(project, monkeypatch, times=1)
+    with pytest.raises(OSError):
+        revision.apply_edit(project, SCENE,
+                            [{"old": LINE_1_OLD, "new": LINE_1_NEW}])
+
+    # Read the FILE, not the document: `load_working` runs the recovery hook,
+    # so going through it would let the marker-and-repair safety net produce
+    # the right answer while the rollback was doing nothing. The rollback's own
+    # promise is narrower and faster — text and history agree on disk at the
+    # moment the writer is told the edit failed — so that is what is asserted.
+    with open(revision.working_path(project), "r", encoding="utf-8") as f:
+        on_disk = f.read()
+    assert LINE_1_NEW not in on_disk, (
+        "the file on disk still carries an edit whose history record was never "
+        "written; the writer's next read would be a repair, not a document")
+    assert not os.path.exists(revision.divergence_marker_path(project)), (
+        "the rollback succeeded, so nothing should be flagged for repair")
+
+    after = _working_text(project)
+    assert LINE_1_NEW not in after, (
+        f"the rolled-back copy still carries the edit: {after!r}")
+    assert after == before, f"rollback was not exact: {before!r} -> {after!r}"
+
+
 def test_the_refusal_does_not_leave_a_stale_redo_stack(project, monkeypatch):
     """A rolled-back apply must not invalidate redo history it never created."""
     revision.apply_edit(project, SCENE, [{"old": LINE_1_OLD, "new": LINE_1_NEW}])
@@ -150,6 +182,30 @@ def test_a_second_attempt_after_a_failure_succeeds(project, monkeypatch):
     assert len(revision.edits_log(project)) == 1
 
 
+def test_the_journal_is_written_before_the_document(project, monkeypatch):
+    """Write-ahead, in the only order that can recover: flag, then text.
+
+    The journal's whole job is to be on disk at the instant the document could
+    change, so that an interruption between the two is detectable. Written
+    after the document it would record nothing the document does not already
+    say, and a crash in the gap would be invisible — which is the gap itself.
+    """
+    seen = []
+    real_save = revision.ScriptDocument.save
+
+    def traced(self, path, *a, **kw):
+        seen.append(os.path.exists(revision.journal_path(project)))
+        return real_save(self, path, *a, **kw)
+
+    monkeypatch.setattr(revision.ScriptDocument, "save", traced)
+    revision.apply_edit(project, SCENE, [{"old": LINE_1_OLD, "new": LINE_1_NEW}])
+
+    assert seen, "no document save was observed"
+    assert all(seen), (
+        f"a document save ran with no journal on disk (observed: {seen}); a "
+        "crash at that instant leaves changed text and no record of it")
+
+
 def test_a_failed_document_write_leaves_no_journal_behind(project, monkeypatch):
     """A refusal before anything changed must leave NOTHING flagged.
 
@@ -163,10 +219,17 @@ def test_a_failed_document_write_leaves_no_journal_behind(project, monkeypatch):
         revision.apply_edit(project, SCENE,
                             [{"old": LINE_1_OLD, "new": LINE_1_NEW}])
 
+    # Asked BEFORE anything reads the copy: a read runs the same repair, so
+    # reading first and asserting after would let a stranded journal be cleared
+    # by the observation itself.
+    report = revision.recover_working_from_log(project)
+    assert report["repaired"] is False, (
+        f"a clean refusal was reported as damage to be repaired: {report}")
+    assert report["reason"] == "", f"a refusal was reported as damage: {report}"
+
     assert _working_text(project) == before
     assert not os.path.exists(revision.journal_path(project))
     assert not os.path.exists(revision.divergence_marker_path(project))
-    assert revision.recover_working_from_log(project)["repaired"] is False
 
 
 def test_an_unrecoverable_rollback_is_marked_not_hidden(project, monkeypatch):
