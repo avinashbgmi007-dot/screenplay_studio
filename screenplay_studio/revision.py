@@ -1657,6 +1657,14 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
         # resolvable against the value the document will actually hold.
         identity = _block_speaker(elements, el) or el.character
         el.text = new_text
+        # Gap 22. Emphasis is stored as character ranges into the OLD text, so a
+        # whole-line replacement has to drop them: keeping them would attach the
+        # writer's emphasis to whichever characters happen to sit at those
+        # offsets in the new sentence — a silent, wrong edit wearing the clothes
+        # of preservation. We cannot know where the emphasis should land in
+        # text the writer only just wrote, so the honest answer is that the new
+        # line carries none.
+        el.spans = []
         renamed = _retag_element(el, new_text)
         if renamed:
             # Gap 52: the cue is one line but the speaker is a property of the

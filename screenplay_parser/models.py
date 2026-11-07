@@ -25,6 +25,31 @@ class ElementType(str, Enum):
     GENERAL = "general"  # title page / unclassified text
 
 
+def _spans_from(row: dict) -> list[dict]:
+    """Emphasis spans from a stored row, tolerating anything a hand edit or an
+    older build left behind. A damaged span is dropped, never raised: this runs
+    while loading the writer's document, and losing one emphasis mark is a much
+    smaller harm than refusing to open the script."""
+    raw = row.get("spans")
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for span in raw:
+        if not isinstance(span, dict):
+            continue
+        try:
+            start, end = int(span.get("start", 0)), int(span.get("end", 0))
+        except (TypeError, ValueError):
+            continue
+        styles = span.get("styles")
+        if not isinstance(styles, (list, tuple)) or end <= start:
+            continue
+        clean = [str(st) for st in styles if isinstance(st, str) and st]
+        if clean:
+            out.append({"start": start, "end": end, "styles": clean})
+    return out
+
+
 @dataclass
 class Element:
     """A single formatted unit inside a scene, in original document order."""
@@ -32,10 +57,31 @@ class Element:
     text: str
     character: Optional[str] = None  # populated for DIALOGUE / PARENTHETICAL elements
     line_start: Optional[int] = None  # source line number, if known (txt/fountain)
+    # Gap 22. Emphasis, as [{start, end, styles}] half-open character ranges into
+    # `text`. Empty means "no emphasis", which is what every document parsed
+    # before this field existed means — so absence and emptiness are the same
+    # fact, and old working.json files load unchanged.
+    #
+    # Ranges rather than a per-character list: emphasis is contiguous in real
+    # scripts, a range list survives JSON without a schema, and a 4000-character
+    # action line does not turn into 4000 records.
+    spans: list[dict] = field(default_factory=list)
+
+    def styles_at(self, index: int) -> frozenset:
+        """The set of styles covering character `index`, empty if none."""
+        return frozenset(style
+                         for span in self.spans
+                         if span.get("start", 0) <= index < span.get("end", 0)
+                         for style in span.get("styles", ()))
 
     def to_dict(self) -> dict:
         d = asdict(self)
         d["type"] = self.type.value
+        if not self.spans:
+            # Written only when there is something to write, so an unstyled
+            # document's stored form is byte-identical to what it was before
+            # this field existed.
+            d.pop("spans", None)
         return d
 
 
@@ -137,7 +183,8 @@ class ScriptDocument:
             parse_confidence=d.get("parse_confidence", "high"),
         )
         doc.front_matter = [
-            Element(type=ElementType(e["type"]), text=e["text"], character=e.get("character"), line_start=e.get("line_start"))
+            Element(type=ElementType(e["type"]), text=e["text"], character=e.get("character"),
+                    line_start=e.get("line_start"), spans=_spans_from(e))
             for e in d.get("front_matter", [])
         ]
         doc.warnings = [
@@ -156,7 +203,8 @@ class ScriptDocument:
                 characters_present=s.get("characters_present", []),
             )
             scene.elements = [
-                Element(type=ElementType(e["type"]), text=e["text"], character=e.get("character"), line_start=e.get("line_start"))
+                Element(type=ElementType(e["type"]), text=e["text"], character=e.get("character"),
+                        line_start=e.get("line_start"), spans=_spans_from(e))
                 for e in s.get("elements", [])
             ]
             doc.scenes.append(scene)

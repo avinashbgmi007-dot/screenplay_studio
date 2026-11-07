@@ -235,6 +235,45 @@ def to_txt(doc: ScriptDocument, provenance=None) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+def _runs_for(text: str, spans) -> list[tuple[str, str | None]]:
+    """Split `text` into (chunk, style_or_None) runs for FDX.
+
+    Spans are half-open ranges of style names; overlapping spans compose, so a
+    character covered by Bold and Italic is emitted as one `Bold+Italic` run.
+    Adjacent runs with the same style are merged, which keeps a round trip
+    stable (export -> parse -> export is identical rather than sprouting a new
+    run on every save).
+
+    Tolerant by design: a span past the end is clamped, an inverted span is
+    ignored, and text with no spans returns one unstyled run. This is called
+    while writing the writer's export, so corrupt emphasis must degrade to plain
+    text rather than take the export down.
+    """
+    if not text:
+        return []
+    per_char: list[set[str]] = [set() for _ in text]
+    for span in spans or []:
+        try:
+            start = max(0, int(span.get("start", 0)))
+            end = min(len(text), int(span.get("end", 0)))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        styles = [str(st) for st in (span.get("styles") or []) if st]
+        if end <= start or not styles:
+            continue
+        for i in range(start, end):
+            per_char[i].update(styles)
+
+    runs: list[tuple[str, str | None]] = []
+    for ch, styles in zip(text, per_char):
+        style = "+".join(sorted(styles)) if styles else None
+        if runs and runs[-1][1] == style:
+            runs[-1] = (runs[-1][0] + ch, style)
+        else:
+            runs.append((ch, style))
+    return runs
+
+
 def to_fdx(doc: ScriptDocument, provenance=None) -> str:
     """
     Final Draft XML export. Paragraph types map 1:1 onto the parser's
@@ -267,16 +306,30 @@ def to_fdx(doc: ScriptDocument, provenance=None) -> str:
 
     content = ET.SubElement(root, "Content")
 
-    def add_paragraph(etype: ElementType, text: str, number: str | None = None):
+    def add_paragraph(etype: ElementType, text: str, number: str | None = None,
+                      spans=None):
+        """One <Paragraph>, split into styled <Text> runs where emphasis exists.
+
+        Gap 22. This used to write a single plain <Text>, so any emphasis the
+        document carried was dropped on the way out — with the format blamed.
+        FDX expects the split: a run per stretch, `Style="Bold+Italic"` where
+        styles compose.
+
+        Unstyled text still emits exactly one run with no Style attribute, so a
+        document without emphasis exports byte-for-byte as it did before.
+        """
         p = ET.SubElement(content, "Paragraph", Type=FDX_TYPE_NAMES.get(etype, "General"))
         if number:
             p.set("Number", number)
-        text_el = ET.SubElement(p, "Text")
-        text_el.text = text
+        for chunk, style in _runs_for(text, spans):
+            text_el = ET.SubElement(p, "Text")
+            if style:
+                text_el.set("Style", style)
+            text_el.text = chunk
 
     for el in doc.front_matter:
         if el.text:
-            add_paragraph(el.type, el.text)
+            add_paragraph(el.type, el.text, spans=el.spans)
 
     for scene in doc.scenes:
         add_paragraph(ElementType.SCENE_HEADING, scene.heading_raw, str(scene.scene_number))
@@ -284,7 +337,7 @@ def to_fdx(doc: ScriptDocument, provenance=None) -> str:
             if el.type == ElementType.SCENE_HEADING:
                 continue  # heading already emitted
             if el.text:
-                add_paragraph(el.type, el.text)
+                add_paragraph(el.type, el.text, spans=el.spans)
 
     body = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     return body.decode("utf-8")
