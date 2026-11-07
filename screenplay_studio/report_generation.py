@@ -141,23 +141,55 @@ def publish_generation(m, gen_dir: str) -> dict:
     if man is None:
         raise ValueError(f"no complete reading to publish at {os.path.basename(gen_dir)}")
 
+    # Gap 65. This used to read `except Exception: live_digest = None` and then
+    # `if live_digest is not None and ...`: an unreadable draft therefore SKIPPED
+    # the comparison and the run published anyway. "I could not check the draft"
+    # was treated as "the draft is fine" — and an unreadable working copy is
+    # exactly what a concurrent writer or an interrupted cycle leaves behind, so
+    # the guard evaporated in the one condition it exists for.
+    #
+    # Verified or not published. The two failures are refused with different
+    # words, because they call for different actions: a reader whose script
+    # changed needs to re-run; a reader whose script cannot be read needs to
+    # repair the project, and telling them "the draft changed" would send them
+    # looking for a switch that never happened.
     try:
         from .revision import load_working
         live_digest = document_digest(load_working(m))
-    except Exception:                                        # noqa: BLE001
-        live_digest = None
-    if live_digest is not None and man.get("digest") != live_digest:
+    except Exception as e:                                   # noqa: BLE001
+        raise ValueError(
+            "the script on screen could not be read while this analysis "
+            f"finished ({e}), so its findings were not published — publishing "
+            "them would put a reading next to a draft nobody can verify. The "
+            "previous reading is unchanged. Repair the project, then run the "
+            "analysis again.") from e
+    if man.get("digest") != live_digest:
         raise ValueError(
             "the draft changed while this analysis was running, so its findings "
             "were not published — they describe a script that is no longer on "
             "screen. Run the analysis again.")
 
+    # Gap 65: every live path is DERIVED from this generation's directory and
+    # its manifest, and each source must exist and be inside that directory.
+    # The names used to be looked up on the project while the sources were
+    # joined to `gen_dir`, so the two halves could disagree: a manifest naming a
+    # path outside its own generation would copy an unrelated file into the live
+    # report, and a missing artifact was silently skipped with the pointer still
+    # moved — a publication that claims a reading it never copied.
+    gen_root = os.path.abspath(gen_dir)
     for live, rel in ((m.report_md_path, man["markdown"]),
                       (m.report_findings_path, man["findings"]),
                       (m.report_snapshot_path, man["snapshot"])):
-        src = os.path.join(gen_dir, rel)
-        if os.path.exists(src):
-            shutil.copy2(src, live)
+        src = os.path.abspath(os.path.join(gen_root, rel))
+        if not src.startswith(gen_root + os.sep):
+            raise ValueError(
+                f"the staged reading names {rel!r} outside its own folder, so it "
+                "was not published — a reading can only publish files it staged")
+        if not os.path.exists(src):
+            raise ValueError(
+                f"the staged reading is missing {rel!r}, so it was not published "
+                "— an incomplete run must not move the pointer")
+        shutil.copy2(src, live)
 
     atomic_write_json(m.report_pointer_path, {
         "generation": os.path.basename(gen_dir),

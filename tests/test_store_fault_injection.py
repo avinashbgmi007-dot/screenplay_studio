@@ -109,6 +109,16 @@ def _publish_a_reading(m) -> None:
     doc = ScriptDocument.load(m.parsed_path) if os.path.exists(m.parsed_path) else None
     if doc is None:
         doc = parse_fountain(m.source_path)
+        # Gap 65 made publication refuse a reading it cannot verify against the
+        # draft on screen, and this fixture had no parsed script and therefore no
+        # working copy — so it only ever published because an unreadable draft
+        # SKIPPED the check. That was the fail-open being leaned on silently.
+        # Materialising the parse is what a real project always has before an
+        # analysis can publish anything, so the fixture now resembles one and
+        # the pointer's damage contract is tested without the hole in place.
+        from screenplay_studio import revision
+        doc.save(m.parsed_path)
+        revision.ensure_working(m)
     gen = report_generation.new_generation_dir(m, document_digest(doc))
     report_generation.stage_generation(AnalysisResult(doc), gen, m,
                                        document_digest(doc), doc)
