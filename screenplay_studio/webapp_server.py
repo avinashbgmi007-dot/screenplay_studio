@@ -2750,6 +2750,81 @@ def _mark_completeness(resp, skipped: list, failed: list | None = None) -> None:
         resp.headers["X-Backup-Omitted"] = str(len(parts))
 
 
+# The keys this build knows are secrets. A project manifest carries exactly one
+# (gap 57/58); it is the only field here that is redacted, and it is redacted by
+# NAME rather than by guessing at shapes in the text.
+_SECRET_MANIFEST_KEYS = ("api_key",)
+
+# Files whose contents are a manifest with secret fields in it.
+_REDACTABLE_SUFFIXES = ("project.json",)
+
+
+def _redacted_manifest_bytes(full: str) -> tuple[bytes | None, list[str]]:
+    """The file's bytes with every secret field cleared, plus what was cleared.
+
+    Returns (None, []) when this file is not a manifest, so the caller knows to
+    add it unchanged.
+
+    Gap 8. The token lives in `project.json` on purpose (gap 58's
+    `_adopt_connection` copies it into every project so `resume` and the CLI work
+    without the writer retyping it). That is right for a file at rest on the
+    writer's own disk and wrong for an archive whose entire purpose is to leave
+    that disk — a backup gets emailed, dropped in a shared folder, put on a
+    stick.
+
+    Deliberately NOT a text scrub. Matching a token's shape across arbitrary
+    content would either miss a key it did not recognise or corrupt a script
+    that happened to contain the same characters. The manifest's structure names
+    its own secret, so this clears that field and leaves every other byte of the
+    document intact — which is what keeps the restore whole.
+    """
+    if os.path.basename(full) not in _REDACTABLE_SUFFIXES:
+        return None, []
+    try:
+        with open(full, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        # Unreadable or unparseable: hand it to _add_file untouched rather than
+        # silently substituting something. A damaged manifest is gap 80's
+        # territory, not this one.
+        return None, []
+    if not isinstance(data, dict):
+        return None, []
+
+    cleared = [key for key in _SECRET_MANIFEST_KEYS
+               if data.get(key) not in (None, "")]
+    if not cleared:
+        return None, []
+    for key in cleared:
+        data[key] = None
+    return json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8"), cleared
+
+
+def _add_file_redacted(zf, full: str, arcname: str, skipped: list, kept: list,
+                       withheld: list) -> None:
+    """`_add_file`, but a manifest loses its secret fields on the way in."""
+    payload, cleared = _redacted_manifest_bytes(full)
+    if payload is None:
+        _add_file(zf, full, arcname, skipped, kept)
+        return
+    zf.writestr(arcname, payload, zipfile.ZIP_DEFLATED)
+    kept.append(arcname)
+    withheld.append({"path": arcname, "cleared": cleared,
+                     "why": "a credential must not travel in an archive"})
+
+
+def _mark_credentials(resp, withheld: list) -> None:
+    """Say on the response that a credential was left behind (gap 8).
+
+    A separate header from `X-Backup-Complete` on purpose: "your archive does
+    not hold everything" and "your archive does not hold your API key" are
+    different facts, and the second one is good news. Folding it into the
+    completeness header would report a successful redaction as an incomplete
+    backup.
+    """
+    resp.headers["X-Backup-Credentials"] = "withheld" if withheld else "none"
+
+
 def _add_file(zf, full: str, arcname: str, skipped: list, kept: list) -> None:
     """Add one file to the archive, recording whether it made it (gap 72).
 
@@ -2790,6 +2865,7 @@ def backup_project(name):
     buf = io.BytesIO()
     skipped: list[dict] = []
     kept: list[str] = []
+    withheld: list[dict] = []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, _dirs, files in os.walk(project_dir):
             for fname in files:
@@ -2799,7 +2875,7 @@ def backup_project(name):
                     continue
                 full = os.path.join(root, fname)
                 arcname = os.path.join(name, os.path.relpath(full, project_dir))
-                _add_file(zf, full, arcname, skipped, kept)
+                _add_file_redacted(zf, full, arcname, skipped, kept, withheld)
         # Gap 72: the archive carries its own account of itself, so the record
         # travels with the file rather than only in a response header the
         # browser throws away.
@@ -2821,11 +2897,16 @@ def backup_project(name):
             "files": len(kept),
             "skipped": skipped,
             "complete": not skipped,
+            # Gap 8: named, not just absent. A backup that quietly omits
+            # something is the gap-72 defect wearing a security hat, so the
+            # omission is on the record in the same place as every other one.
+            "credentials_withheld": withheld,
         }, indent=2), zipfile.ZIP_DEFLATED)
     buf.seek(0)
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"{name}-backup.zip")
     _mark_completeness(resp, skipped)
+    _mark_credentials(resp, withheld)
     return resp
 
 
@@ -2846,6 +2927,7 @@ def backup_library():
     included, failed = [], []
     skipped: list[dict] = []
     kept: list[str] = []
+    withheld: list[dict] = []
     stamp = time.strftime("%Y%m%d-%H%M")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         if os.path.isdir(PROJECTS_DIR):
@@ -2864,7 +2946,7 @@ def backup_library():
                             full = os.path.join(root, fname)
                             arc = os.path.join(name, os.path.relpath(full, project_dir))
                             before = len(skipped)
-                            _add_file(zf, full, arc, skipped, kept)
+                            _add_file_redacted(zf, full, arc, skipped, kept, withheld)
                             if len(skipped) == before:
                                 n_files += 1
                     included.append({"project": name, "files": n_files})
@@ -2883,11 +2965,13 @@ def backup_library():
             # still said it was a backup of everything.
             "skipped": skipped,
             "complete": not (skipped or failed),
+            "credentials_withheld": withheld,
         }, indent=2), zipfile.ZIP_DEFLATED)
     buf.seek(0)
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"script-doctor-library-backup-{stamp}.zip")
     _mark_completeness(resp, skipped, failed)
+    _mark_credentials(resp, withheld)
     return resp
 
 
