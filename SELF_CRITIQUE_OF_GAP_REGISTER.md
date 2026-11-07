@@ -3593,3 +3593,51 @@ window sees a half-written document. Binding reports per-draft (the C2 option th
 user did not pick) remains unimplemented. The entry stays NARROWED rather than
 FIXED, because a reader of the register should not have to discover that the
 "refused" in the message is only true within one process.
+
+## §85 — Gap 7 / gap 65: the mechanism was there; nobody had claimed it (2026-11-08)
+
+**Reverts: 7 / 1 / 1 / 1 / 2 / 3.** 12 tests.
+
+The instruction was "shared cross-process run/publish coordination". Before
+designing anything I read `jsonio` and found it had carried a working advisory
+file lock for years — every store in this package takes one, and it is correct
+across processes on both platforms. Nothing new was needed mechanically. The
+analysis run simply had no claim of its own, and `_analyze_lock` is a
+`threading.Lock`, so two browser tabs were serialised and a CLI run beside the
+web UI was not.
+
+That is the second gap running where the honest answer was "this already
+exists, it just is not used here" (§84 was the first). Both times the register's
+filed text pointed at a design, and the code pointed at a missing call.
+
+Two older defects surfaced on the way, neither of them this gap:
+
+- **`main()` discarded every handler's exit status.** A refused run printed its
+  refusal to stderr and exited **0**. This is gap 39's bug class — "reports a
+  failure with a success status" — surviving in the dispatcher gap 39 never
+  looked at, because gap 39's fix went into `cmd_watch`'s own return path. Found
+  only because the CLI leg of the new test asserts the *process* exit code; an
+  in-process call would have returned 1 happily while the program reported
+  success.
+- **My own first guard crashed when the project directory did not exist yet**,
+  which is the normal state when `run` is about to create one — the guard ran
+  before the code that makes the directory.
+
+The revert discipline earned its keep again, and in the same way as §84. R1
+("the run lock takes no OS lock") came back **12 passed** — a green result on the
+single most important line of the change. It was not a blind test: my patch had
+hit `_acquire_os_lock`, the helper `_StoreLock` uses, while `RunLock` has its own
+inline `flock` thirty lines further down. Re-aimed by locating the call *inside*
+the `RunLock` class rather than by matching text, it failed **7 tests**. Twice
+now I have reported a surviving revert that was really a mis-aimed one, and twice
+the difference was only visible by checking the patch landed where I meant rather
+than where the string matched. That is worth stating as a rule: **a revert must
+be shown to have changed behaviour, not merely to have been written.**
+
+Gap 65 closes here rather than earlier because its remaining hole was the
+cross-process switch — the threading lock could never see a CLI run, so a switch
+during one was allowed and that run published into a draft it never read. The
+same run lock answers it. What is still true, and stated rather than glossed:
+reports remain one live set per project, not one per draft, so a reading of an
+older draft is *refused* rather than kept and labelled. That is a product
+decision (the C2 option), not a safety hole.
