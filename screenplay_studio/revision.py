@@ -701,6 +701,74 @@ def edits_redo_path(m) -> str:
     return os.path.join(m.project_dir, "edits.redo.json")
 
 
+def journal_path(m) -> str:
+    """The in-flight apply's write-ahead record (gap 6).
+
+    Written BEFORE `working.json` is touched and removed only once the edit is
+    in `edits.json`. Its existence at the start of a cycle is the one fact that
+    can distinguish "an apply was interrupted between its two writes" from "the
+    writer's document is simply where it is".
+    """
+    return os.path.join(m.project_dir, "edit.journal.json")
+
+
+def divergence_marker_path(m) -> str:
+    """Set when a document and its history are KNOWN to disagree (gap 6).
+
+    The narrow, honest case: the edit could not be recorded AND the rollback of
+    the text also failed, so the call cannot restore agreement itself. Rather
+    than let the next reader present a silently diverged document as normal,
+    the disagreement is asserted on disk and repaired by the next cycle.
+    """
+    return os.path.join(m.project_dir, "divergence.json")
+
+
+def mark_divergence(m, reason: str) -> None:
+    """Record that text and history disagree. Best-effort by design: callers
+    reach this from inside an exception handler that is already unwinding, so a
+    failure here must not replace the writer's real error."""
+    from .jsonio import atomic_write_json
+    try:
+        atomic_write_json(divergence_marker_path(m),
+                          {"reason": str(reason), "marked_at": time.time()})
+    except (OSError, ValueError):
+        pass
+
+
+def clear_divergence(m) -> None:
+    """Remove the journal and the marker, in that order.
+
+    Journal first: the journal is what a reader waits on to decide an apply was
+    interrupted, so it must be the first to go once the two stores agree.
+    """
+    for path in (journal_path(m), divergence_marker_path(m)):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+
+
+def _read_diagnostic(m, path: str) -> tuple[dict | None, str]:
+    """Read a journal/marker: (payload, "") or (None, why it could not be read).
+
+    A MISSING file is (None, "") — nothing to say. An unreadable one is
+    (None, reason), because "damaged" and "absent" are different facts and only
+    one of them means the document needs checking.
+    """
+    if not os.path.exists(path):
+        return None, ""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as exc:
+        return None, f"{os.path.basename(path)} could not be read ({exc})"
+    if not isinstance(data, dict):
+        return None, f"{os.path.basename(path)} is not a record"
+    return data, ""
+
+
 # ---------------------------------------------------------------------------
 # The edit-cycle lock topology (P1-3, audit 2026-09)
 # ---------------------------------------------------------------------------
@@ -743,6 +811,86 @@ def _remove_with_retry(path: str) -> None:
         pass  # already gone == cleared
 
 
+def recover_working_from_log(m) -> dict:
+    """Settle a document/history disagreement left by an interrupted apply (gap 6).
+
+    Called at the top of every working-copy cycle, so the reader never sees the
+    divergence as normal. Three states matter, and only the third changes
+    anything:
+
+      * nothing on disk flags a problem -> `{"repaired": False, "reason": ""}`;
+      * a journal says an apply was interrupted -> rebuild the copy by replaying
+        the LOG, because the log is the record of what the writer agreed to, and
+        re-derive the marker before writing so a crash DURING the repair is
+        still repairable;
+      * a marker reports text and history disagreeing -> same replay.
+
+    Replay starts from the parsed document rather than from the working copy on
+    purpose: the working copy is the suspect file. If replay cannot account for
+    the log (a line the writer edited by hand no longer matches), the copy is
+    kept as it is and the disagreement is REPORTED — repairing by guessing would
+    overwrite editing the writer did on purpose.
+
+    Idempotent: a project with nothing flagged is never written to.
+    """
+    from .jsonio import lock_for
+    with lock_for(working_path(m)):
+        journal, journal_problem = _read_diagnostic(m, journal_path(m))
+        marker, marker_problem = _read_diagnostic(m, divergence_marker_path(m))
+        if journal is None and marker is None:
+            if not (journal_problem or marker_problem):
+                return {"repaired": False, "reason": ""}
+            # A flag we cannot read is still a flag: report it, and clear it so
+            # a torn marker cannot wedge every later cycle.
+            clear_divergence(m)
+            return {"repaired": False,
+                    "reason": "; ".join(p for p in (journal_problem, marker_problem) if p)}
+
+        reason = ((marker or {}).get("reason")
+                  or f"an apply was interrupted before its history record was written"
+                  f" (journal {journal.get('id', 'unknown') if journal else 'unknown'})")
+        try:
+            log = edits_log(m)
+        except Exception as exc:  # damaged log: refuse, and say so
+            return {"repaired": False,
+                    "reason": f"the edit log is unreadable ({exc}); not repairing"}
+        try:
+            doc = ScriptDocument.load(m.parsed_path)
+        except (OSError, ValueError) as exc:
+            return {"repaired": False,
+                    "reason": f"the parsed script is unreadable ({exc}); not repairing"}
+
+        lost = []
+        for record in log:
+            pairs = [{"old": rep.get("old", ""), "new": rep.get("new", "")}
+                     for rep in (record.get("applied") or [])]
+            if not pairs:
+                continue
+            result = apply_replacements(doc, record.get("scene_number"), pairs)
+            for skipped in result["skipped"]:
+                lost.append({"scene_number": record.get("scene_number"),
+                             "old": skipped.get("old"),
+                             "reason": skipped.get("reason")})
+
+        if lost:
+            # Keep the writer's copy; only say what could not be accounted for.
+            clear_divergence(m)
+            return {"repaired": False, "source": "log",
+                    "reason": f"{len(lost)} recorded edit(s) could not be replayed "
+                              f"onto the parsed script: {lost[:3]}"}
+
+        try:
+            doc.save(working_path(m))
+        except (OSError, ValueError) as exc:
+            # Still diverged: keep the marker so the NEXT cycle tries again.
+            mark_divergence(m, f"repair could not be written ({exc})")
+            return {"repaired": False, "source": "log",
+                    "reason": f"the repaired copy could not be written ({exc})"}
+        clear_divergence(m)
+        return {"repaired": True, "source": "log", "reason": reason,
+                "applied_records": len(log)}
+
+
 def ensure_working(m) -> str:
     """Create the working copy from the parsed document on first use.
 
@@ -759,6 +907,11 @@ def ensure_working(m) -> str:
     from .jsonio import lock_for
     path = working_path(m)
     with lock_for(path):
+        # Gap 6: a document and its history can disagree only if an apply was
+        # interrupted between its two writes. Settle that HERE, before anything
+        # reads the copy, so no caller can be handed the divergence as normal.
+        # Inert on a healthy project (it takes the lock it already holds).
+        recover_working_from_log(m)
         if not os.path.exists(path):
             if not os.path.exists(m.parsed_path):
                 raise FileNotFoundError(
@@ -806,13 +959,67 @@ def save_working(m, doc: ScriptDocument, record: dict | None = None) -> None:
     # 200/200 across two OS processes). That is a lost update on a
     # read-modify-write cycle, not a torn file — the rename is atomic.
     with lock_for(wp):
-        doc.save(wp)
-        log_path = edits_log_path(m)
-        log = edits_log(m)
+        # Gap 6. The order used to be: save the document, then append the log.
+        # Every failure in between — a full disk, a sharing violation, a crash —
+        # left the writer's text changed in the only place it survives with no
+        # record for it, so undo could not reach the edit that had just
+        # happened. The three writes are now ordered by what each one can
+        # recover from:
+        #
+        #   1. the journal, which says an apply is in flight (nothing depends
+        #      on it yet, so a failure here is a clean refusal);
+        #   2. the document;
+        #   3. the log, and only after it lands is the journal cleared.
+        #
+        # So a failure at (2) refuses cleanly, and a failure at (3) rolls the
+        # document back to the text it had before this call. If even the
+        # rollback cannot be written the disagreement becomes the MARKER, for
+        # `recover_working_from_log` to settle in the next cycle.
         if "id" not in record:
             record["id"] = uuid.uuid4().hex[:12]
-        log.append(record)
-        atomic_write_json(log_path, log)
+        journal = {"id": record["id"], "record": record,
+                   "started_at": time.time()}
+        atomic_write_json(journal_path(m), journal)
+        try:
+            doc.save(wp)
+        except BaseException:
+            # The journal landed but the document did not: nothing has changed
+            # yet, so this is a clean refusal. Clearing the journal here is what
+            # stops the NEXT cycle from reporting an interrupted apply that
+            # never happened.
+            clear_divergence(m)
+            raise
+        log_path = edits_log_path(m)
+        log = edits_log(m)
+        appended = list(log)
+        appended.append(record)
+        try:
+            atomic_write_json(log_path, appended)
+        except BaseException:
+            # The document now carries an edit the log does not. Undo the edit
+            # in memory, exactly — `apply_replacements` matches whole values
+            # only — and persist that, so text and history agree again.
+            rolled_back = False
+            try:
+                undo_pairs = [{"old": rep.get("new", ""), "new": rep.get("old", "")}
+                              for rep in (record.get("applied") or [])]
+                result = apply_replacements(doc, record.get("scene_number"), undo_pairs)
+                rolled_back = bool(result["applied"]) and not result["skipped"]
+                if rolled_back:
+                    doc.save(wp)
+            except (OSError, ValueError, KeyError):
+                rolled_back = False
+            if rolled_back:
+                clear_divergence(m)
+                raise
+            mark_divergence(
+                m,
+                "The edit could not be recorded and the text could not be "
+                "restored to its previous state; the next cycle will rebuild "
+                "the working copy from the edit log.")
+            raise
+        # the edit is durable in BOTH stores: the journal has done its job
+        clear_divergence(m)
         # a fresh edit invalidates any redo history
         clear_redo(m)
 

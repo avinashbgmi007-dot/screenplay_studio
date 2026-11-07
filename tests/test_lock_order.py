@@ -192,10 +192,19 @@ def guard_factory(monkeypatch):
 
 
 def _roles_for(m) -> dict:
-    """The documented P1-3 topology for one concrete project."""
+    """The documented P1-3 topology for one concrete project.
+
+    `edit.journal.json` and `divergence.json` are gap 6's leaves: written and
+    cleared by `save_working` while the cycle lock is held, exactly as the log
+    and redo stack are. They are terminal — nothing acquires a lock while
+    holding one of theirs — so the working -> leaf order still holds, and this
+    table is where that has to be declared rather than assumed.
+    """
     return {
         revision.working_path(m): {revision.edits_log_path(m),
-                                   revision.edits_redo_path(m)},
+                                   revision.edits_redo_path(m),
+                                   revision.journal_path(m),
+                                   revision.divergence_marker_path(m)},
     }
 
 
