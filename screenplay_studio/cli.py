@@ -119,6 +119,31 @@ def cmd_run(args):
         manifest.model_id = args.model
     manifest.save()
 
+    # Gap 7 / gap 65: a CLI run is the second process in the filed evidence. It
+    # takes the project's run lock before the orchestrator does anything, so it
+    # cannot start alongside a web-UI analysis of the same project, and neither
+    # can start alongside it. The lock is an OS file lock, so a crashed run
+    # releases it; a refusal is exit 1 with a reason rather than a silent
+    # second run.
+    from .jsonio import run_lock
+    # `args.project`, not `manifest.project_dir`: those are the same string on a
+    # normal run, but the lock has to be named by the thing every other process
+    # is given — the directory the user passed — so a relative path from one
+    # shell and an absolute path from another still name ONE lock. That is the
+    # filing error this whole gap is about, one level down.
+    run_claim = run_lock(os.path.abspath(args.project))
+    if not run_claim.try_acquire():
+        print("Another analysis is already running for this project (in "
+              "another process). Wait for it to finish before starting "
+              "another.", file=sys.stderr)
+        return 1
+    try:
+        return _run_stages(args, manifest, orch_unused=None)
+    finally:
+        run_claim.release()
+
+
+def _run_stages(args, manifest, orch_unused=None):
     orch = Orchestrator(manifest)
     categories = tuple(args.categories.split(",")) if args.categories else None
 
@@ -290,7 +315,16 @@ def main():
     args = parser.parse_args()
     if args.command == "run":
         _resolve_run_paths(parser, args)
-    args.func(args)
+    # Gap 7 caught this on the way past. Every command's handler RETURNS its
+    # exit status (`cmd_watch` returns WATCH_EXIT_ERROR, `cmd_run` returns 1 when
+    # another process holds the run), and this line threw the value away — so
+    # `sys.exit()` at interpreter exit used 0 and a failed command reported
+    # success. That is gap 39's bug class (a failure that exits 0) surviving in
+    # the dispatcher that gap 39 never looked at, because gap 39's fix went into
+    # `cmd_watch`'s own return path.
+    code = args.func(args)
+    if isinstance(code, int) and code != 0:
+        sys.exit(code)
 
 
 def _resolve_run_paths(parser, args) -> None:

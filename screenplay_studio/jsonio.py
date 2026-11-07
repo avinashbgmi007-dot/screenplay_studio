@@ -175,6 +175,93 @@ def _release_os_lock(fd: int) -> None:
             pass
 
 
+class RunLock:
+    """One exclusive, cross-process claim on a project's analysis run.
+
+    Gap 7 / gap 65. The webapp's `_analyze_lock` is a `threading.Lock`: it
+    serialises two browser tabs and nothing else. A CLI `analyze` and the web UI
+    on the same project each take their own private lock, both believe they are
+    the only run, and both publish. Measured with two real OS processes: both
+    entered the run.
+
+    This is the same mechanism every store already uses — an advisory lock on a
+    sidecar file — narrowed to one purpose: *whoever holds it is the only run for
+    this project, in any process.* Deliberately NOT a `_StoreLock`: that type is
+    reentrant, which is right for a store held across a read-modify-write and
+    wrong here, because a second acquisition by the same process must be a
+    refusal rather than a deeper nest.
+
+    **It cannot go stale.** `flock`/`msvcrt` locks are released by the kernel
+    when the holding descriptor closes, including when the process dies, so a
+    crashed run leaves nothing to clean up and nothing to time out. That is why
+    this is a lock and not a PID file: a PID file needs a liveness rule, and
+    every liveness rule is wrong after a reboot or a PID reuse.
+
+    Lock order: a run lock is the OUTERMOST lock a process takes, exactly like
+    the analyze lock it complements. Nothing acquired under it reaches back for
+    it, and it is never taken while a store lock is held.
+    """
+
+    def __init__(self, project_dir: str):
+        # The DIRECTORY is what the existence check needs; `path` is only the
+        # stem the sidecar is named after. Keeping both explicit is what stops
+        # `isdir` being asked about a path that is never a directory.
+        self.project_dir = os.path.abspath(project_dir)
+        self.path = self.project_dir
+        self._fd = -1
+
+    def _lock_path(self) -> str:
+        return os.path.join(self.project_dir, "analyze.run.lock")
+
+    def try_acquire(self) -> bool:
+        """True when this process now holds the run. Never waits, never raises.
+
+        A project directory that does not exist yet cannot host a lock file, and
+        there is also no run to collide with — so this reports the lock as taken
+        and `held()` stays False. Reporting False instead would tell a caller
+        "another analysis is running" about a directory nothing has created.
+        """
+        if not os.path.isdir(self.project_dir):
+            return True
+        try:
+            fd = os.open(self._lock_path(), os.O_CREAT | os.O_RDWR, 0o600)
+        except OSError:
+            return True
+        try:
+            if os.name == "nt":
+                import msvcrt
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return False
+        self._fd = fd
+        return True
+
+    def release(self) -> None:
+        fd, self._fd = self._fd, -1
+        _release_os_lock(fd)
+
+    def held(self) -> bool:
+        return self._fd >= 0
+
+    def __enter__(self) -> "RunLock":
+        self.try_acquire()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        self.release()
+        return False
+
+
+def run_lock(project_dir: str) -> RunLock:
+    """The run lock for one project directory."""
+    return RunLock(project_dir)
+
+
 class _StoreLock:
     """Reentrant in-process AND cross-process lock for one store path.
 

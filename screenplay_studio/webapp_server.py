@@ -2435,6 +2435,21 @@ def _draft_switch_in_progress(name: str):
                       "drafts now would publish its findings into the wrong "
                       "draft. Wait for it to finish, or cancel it first.", 409)
     lock.release()
+    # Gap 65's remaining hole: the check above only sees runs started by THIS
+    # process. A CLI run holding the project's run lock was invisible here, so
+    # the switch went through and that run published into a draft it never read.
+    # The run lock is the cross-process fact; this is where it is answered.
+    from .jsonio import run_lock
+    # `_project_dir` rather than a manifest lookup on purpose: this guard runs
+    # before the route has decided whether the draft even exists, and loading the
+    # manifest here would turn "which draft" into a second failure mode.
+    held = run_lock(_project_dir(name))
+    if not held.try_acquire():
+        return _error("An analysis is running for this project in another "
+                      "process — switching drafts now would publish its "
+                      "findings into the wrong draft. Wait for it to finish "
+                      "before switching.", 409)
+    held.release()
     return None
 
 
@@ -2449,9 +2464,23 @@ def analyze_project(name):
     if not lock.acquire(blocking=False):
         return _error("An analysis is already running for this project — "
                       "wait for it to finish before starting another.", 409)
+    # Gap 7 / gap 65. The lock above is a threading.Lock: it catches two browser
+    # tabs and nothing else. A CLI `analyze` and this server on one project each
+    # take their own private lock, both believe they are the only run, and both
+    # publish — measured with two OS processes, both entered. This one is the
+    # same advisory file lock every store already uses, so it is true across
+    # processes, and it is released by the kernel if the process dies.
+    from .jsonio import run_lock
+    held = run_lock(os.path.abspath(m.project_dir))
+    if not held.try_acquire():
+        lock.release()
+        return _error("An analysis is already running for this project in "
+                      "another process — wait for it to finish before starting "
+                      "another.", 409)
     try:
         return _analyze_locked(m, name)
     finally:
+        held.release()
         lock.release()
         # The run is over (completed, failed, or cancelled) — a stale event
         # must never outlive it, or the NEXT run would cancel on arrival.
