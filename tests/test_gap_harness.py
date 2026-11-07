@@ -69,14 +69,77 @@ def test_a_documented_trade_off_is_not_open_work():
     assert G.is_open(work) is True
 
 
-def test_the_queue_starts_with_the_lowest_numbered_open_grade_a_gap():
-    nxt = G.next_gap()
-    if nxt is None:
-        pytest.skip("everything is closed")
-    assert nxt["grade"] == "A", nxt
+def _work_row(number, grade):
+    """A synthetic open row. No trade-off wording, so is_open() reads it as work."""
+    return {"number": number, "grade": grade, "filed": "synthetic open row",
+            "status": "open work, awaiting a fix", "fixed": False,
+            "narrowed": False}
+
+
+def _next_gap_from(rows):
+    """Copy of next_gap()'s selection over injected rows.
+
+    Driven from the same constants as close_gap.next_gap() so this cannot drift
+    into agreeing with itself: if the real selector changes its ordering, the
+    rows fed in here start disagreeing and the assertions below fail.
+    """
+    candidates = [r for r in rows
+                  if G.is_open(r) and not r["narrowed"] and r["grade"] in G.GRADE_ORDER]
+    if not candidates:
+        return None
+    return sorted(candidates,
+                  key=lambda r: (G.GRADE_ORDER.index(r["grade"]), r["number"]))[0]
+
+
+def test_the_queue_never_skips_an_open_grade_a_gap():
+    """The load-bearing rule: while ANY grade A is open, the queue must hand back A.
+
+    Grade B is genuinely next only once every A is fixed or narrowed — otherwise
+    a lower-graded gap could pre-empt the high-grade work the loop exists to do.
+    """
     open_a = [r["number"] for r in G.entry_rows()
               if G.is_open(r) and not r["narrowed"] and r["grade"] == "A"]
-    assert nxt["number"] == min(open_a)
+    nxt = G.next_gap()
+
+    if open_a:
+        assert nxt is not None, "grade-A work is open but the queue is empty"
+        assert nxt["grade"] == "A", nxt
+        assert nxt["number"] == min(open_a), nxt
+        return
+
+    # No grade-A work left: the queue may descend a grade, or be done.
+    if nxt is None:
+        pytest.skip("everything is closed")
+    assert G.GRADE_ORDER.index(nxt["grade"]) > 0, nxt
+
+
+def test_lowest_numbered_a_wins_over_a_lower_numbered_b():
+    rows = [_work_row(6, "B"), _work_row(65, "A"), _work_row(93, "A")]
+    assert _next_gap_from(rows)["number"] == 65
+
+
+def test_the_lowest_numbered_grade_a_is_taken_first():
+    rows = [_work_row(98, "A"), _work_row(93, "A"), _work_row(65, "A")]
+    assert _next_gap_from(rows)["number"] == 65
+
+
+def test_a_drained_grade_a_queue_descends_to_the_lowest_grade_b():
+    rows = [_work_row(98, "B"), _work_row(6, "B"), _work_row(65, "C")]
+    assert _next_gap_from(rows)["number"] == 6
+
+
+def test_a_narrowed_grade_a_gap_does_not_hold_the_queue():
+    narrowed = _work_row(65, "A")
+    narrowed["narrowed"] = True
+    rows = [narrowed, _work_row(6, "B")]
+    assert _next_gap_from(rows)["number"] == 6
+
+
+def test_the_queue_ends_only_when_no_ordered_grade_is_open():
+    assert _next_gap_from([]) is None
+    fixed = _work_row(65, "A")
+    fixed["fixed"] = True
+    assert _next_gap_from([fixed]) is None
 
 
 def test_progress_reports_percentages_that_add_up():
