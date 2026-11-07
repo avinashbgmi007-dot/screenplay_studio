@@ -94,7 +94,8 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
         scene_norm = _normalize(scene_text)
 
         if quote_norm in scene_norm:
-            finding["verification"] = {"status": "verified", "matched_scene": scene_num, "confidence": 1.0}
+            finding["verification"] = {"status": "verified", "match": "exact",
+                                       "matched_scene": scene_num, "confidence": 1.0}
             return finding
 
         ratio = _best_fuzzy_match(quote_norm, scene_norm)
@@ -117,7 +118,13 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
         return finding
 
     if best_conf >= FUZZY_MATCH_THRESHOLD:
-        finding["verification"] = {"status": "verified", "matched_scene": best_scene, "confidence": round(best_conf, 2)}
+        # Gap 10: this is a REWORDED quote, and it used to be indistinguishable
+        # from an exact hit — both said `verified`. `match` is what separates
+        # "the script says this" from "the script says something this close",
+        # and `confidence` carries how close so the writer can judge.
+        finding["verification"] = {"status": "verified", "match": "approximate",
+                                   "matched_scene": best_scene,
+                                   "confidence": round(best_conf, 2)}
     else:
         # last resort: check if the quote appears ANYWHERE in the script under a
         # different scene number — catches the classic "right quote, wrong scene
@@ -128,6 +135,10 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
             if quote_norm in scene_norm:
                 finding["verification"] = {
                     "status": "verified",
+                    # exact words, WRONG SCENE: the quote is real, the citation
+                    # was not. Saying `exact` here is about the text, which is
+                    # the only thing this function checks.
+                    "match": "exact",
                     "matched_scene": scene.scene_number,
                     "confidence": 1.0,
                     "note": f"Quote found in Scene {scene.scene_number}, not the cited scene(s) {scene_refs} — corrected.",
@@ -234,11 +245,49 @@ def _token_overlap(frag_norm: str, haystack_norm: str) -> float:
     return sum(1 for w in words if w in hay) / len(words)
 
 
+# The keys of `verification_summary` that are NOT locating statuses. They are a
+# second view of a subset of `verified`, so anything that totals the summary has
+# to leave them out or the total exceeds the number of findings (which the suite
+# caught when they were first added inside the counts dict).
+SPLIT_KEYS = ("exact", "approximate")
+
+
+def locating_total(counts: dict) -> int:
+    """How many findings the locating counts account for."""
+    return sum(v for k, v in (counts or {}).items() if k not in SPLIT_KEYS)
+
+
 def verification_summary(findings: list[dict]) -> dict:
+    """Counts by locating status, with `verified` split into exact/approximate.
+
+    Gap 10. `verified` alone cannot tell a byte-for-byte hit from a reworded
+    line, and those are different promises. The total is kept because gap 93's
+    coverage arithmetic divides by it, but `exact` and `approximate` sit beside
+    it so no reader can total them into one comfortable number by accident.
+    """
+    # The LOCATING counts, and only those. `sum(counts.values()) == total
+    # findings` is an invariant other code and tests rely on, so the exact /
+    # approximate split lives in SEPARATE keys — putting them in here made the
+    # totals add up to more than the findings, which the suite caught.
     counts = {"verified": 0, "not_found": 0, "no_quote": 0, "scene_not_found": 0}
+    exact = approximate = 0
     for f in findings:
-        status = f.get("verification", {}).get("status", "no_quote")
-        counts[status] = counts.get(status, 0) + 1
+        v = f.get("verification", {}) or {}
+        status = v.get("status", "no_quote")
+        if status not in counts:
+            counts[status] = 0
+        counts[status] += 1
+        if status != "verified":
+            continue
+        # `match` is written by this module; a finding verified before it
+        # existed has no tag, and calling that `approximate` would understate
+        # a check that was exact. Unknown is neither, so it lands in neither.
+        if v.get("match") == "exact":
+            exact += 1
+        elif v.get("match") == "approximate":
+            approximate += 1
+    counts["exact"] = exact
+    counts["approximate"] = approximate
     return counts
 
 
@@ -255,6 +304,15 @@ def verification_rate(counts: dict) -> dict:
     quote_bearing = counts.get("verified", 0) + counts.get("not_found", 0)
     return {
         "quote_bearing": quote_bearing,
+        "quoted": quote_bearing,
+        # Gap 10: of the quotes we DID locate, how many were the script's own
+        # words? A rate that hides this behind one "verified" number is the
+        # defect — a reworded quote is not the same evidence as an exact one.
+        "exact": counts.get("exact", 0),
+        "approximate": counts.get("approximate", 0),
+        "exact_pct_of_quoted": (
+            round(100.0 * counts.get("exact", 0) / quote_bearing, 1)
+            if quote_bearing else None),
         "verified_pct_of_quoted": (
             round(100.0 * counts.get("verified", 0) / quote_bearing, 1)
             if quote_bearing else None),

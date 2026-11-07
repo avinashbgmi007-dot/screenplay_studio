@@ -187,9 +187,18 @@ function verificationReadoutText(vs) {
   const obs = hasObs
     ? " \u00B7 " + vs.observation_bearing + " carried a checkable observation"
     : "";
+  // Gap 10: "verified" here means LOCATED, and a reworded quote used to count
+  // the same as an exact one. The desk is the surface a writer actually reads,
+  // so the split is stated in the same sentence rather than left to the report.
+  // Only when the field is present: a report produced before the split must not
+  // be given an invented zero.
+  const hasMatch = typeof vs.exact === "number";
+  const exact = hasMatch
+    ? " (" + vs.exact + " exact" + (vs.approximate ? ", " + vs.approximate + " reworded" : "") + ")"
+    : "";
   if (checkable) {
-    return (vs.verified || 0) + " of " + checkable + " quotes verified ("
-      + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
+    return (vs.verified || 0) + " of " + checkable + " quotes found in the script ("
+      + Math.round(100 * (vs.verified || 0) / checkable) + "%)" + exact
       + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "")
       + obs;
   }

@@ -80,8 +80,12 @@ class TestQuotelessCitationsAreChecked:
         doc = _doc()
         out = verify_finding(
             {"scene_refs": [1], "evidence_quote": "I am here now friend."}, doc)
+        # Gap 10 added `match`: this quote is the script's own words, so it is
+        # tagged exact. The rest of the shape is unchanged, which is what this
+        # test was written to protect.
         assert out["verification"] == {
-            "status": "verified", "matched_scene": 1, "confidence": 1.0}
+            "status": "verified", "match": "exact",
+            "matched_scene": 1, "confidence": 1.0}
 
 
 # ---------------------------------------------------------------------------

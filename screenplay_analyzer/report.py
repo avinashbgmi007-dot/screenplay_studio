@@ -40,6 +40,13 @@ VERIFICATION_BADGE = {
     "scene_not_found": " ⚠️ *unverified — cited scene number doesn't exist*",
 }
 
+# Gap 10: a located quote is not necessarily the script's own words. This is
+# appended for a fuzzy hit so a reworded line never looks like a quotation of
+# the script. Deliberately NOT a warning triangle: a paraphrase is legitimate
+# evidence — it is just not the same thing as an exact one, and the writer
+# deserves to know which they are looking at.
+APPROXIMATE_QUOTE_NOTE = " *(reworded — close to the script, not an exact quotation)*"
+
 # Gap 87: the analyse pipeline demotes a finding with no quote and no
 # observation to low severity and marks it `ungrounded` (pipeline
 # .apply_evidence_floor). The desk honours that — such rows are hidden behind a
@@ -159,7 +166,13 @@ def _format_finding(f: dict) -> str:
         lines.append(f"  - *{note}*")
     quote = f.get("evidence_quote")
     if quote and verification.get("status") == "verified":
-        lines.append(f"  - Evidence: \"{quote}\"")
+        # Gap 10: this is the line a finding actually shows in its category
+        # section — the one at the top of the file — so the reworded marker has
+        # to be here too. Annotating only the secondary renderer would have left
+        # the primary one claiming every located quote was the script's words.
+        note_q = (APPROXIMATE_QUOTE_NOTE
+                  if verification.get("match") == "approximate" else "")
+        lines.append(f"  - Evidence: \"{quote}\"{note_q}")
     return "\n".join(lines)
 
 
@@ -286,7 +299,9 @@ def render_markdown(result: AnalysisResult) -> str:
             badge = VERIFICATION_BADGE.get(v.get("status"), "")
             quote = r.get("evidence_quote")
             if quote and v.get("status") == "verified":
-                lines.append(f"- Evidence: \"{quote}\"")
+                note = (APPROXIMATE_QUOTE_NOTE
+                        if v.get("match") == "approximate" else "")
+                lines.append(f"- Evidence: \"{quote}\"{note}")
             elif quote:
                 lines.append(f"- Evidence (unverified): \"{quote}\"{badge}")
             lines.append("")
@@ -506,6 +521,32 @@ def render_markdown(result: AnalysisResult) -> str:
             f"expected for theme/character/structure/scene-function findings, which reason from scene "
             f"summaries rather than full text)."
         )
+        # Gap 10's core sentence, and the reason it is worded this way: the
+        # only thing this pipeline checks mechanically is whether the quoted
+        # TEXT is in the script. Nothing reads the argument. A writer who reads
+        # "citations verified" will assume the finding follows from the
+        # citation, and on a fabricated observation with a real quote it does
+        # not. Saying "we did not assess the claim" is the honest correction,
+        # and inventing a "claim supported" field would be worse than silence:
+        # no argument-level verifier exists here, so any such value would be
+        # fabricated confidence.
+        if v.get("verified", 0):
+            lines.append(
+                "\n**What \"verified\" means here, and what it does not.** A "
+                "verified citation means the quoted text was found in the script. "
+                "It does NOT mean the finding's claim is supported: no part of "
+                "this analysis reads the argument between the quote and the "
+                "conclusion, so a finding can quote a real line exactly and still "
+                "be wrong about what it shows. Treat verified quotes as \"these "
+                "are the writer's own words\" and judge the claim yourself."
+            )
+        if v.get("approximate", 0):
+            lines.append(
+                f"\n**{v.get('approximate')} of those verified citations are "
+                "rewordings rather than exact quotations** — close enough to be "
+                "the same beat, not close enough to be the script's words. Each "
+                "is marked in place."
+            )
         if v.get("scene_not_found", 0):
             lines.append(
                 f"\n**{v.get('scene_not_found', 0)} findings cite scenes that do not exist in the "

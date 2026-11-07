@@ -174,8 +174,12 @@ def test_the_published_counts_describe_the_rows_that_survive():
     assert depth.get("total") == len(result.findings), (
         f"evidence_depth totals {depth.get('total')} rows, report carries "
         f"{len(result.findings)}")
-    assert sum(result.verification.values()) == len(result.findings), (
-        f"verification_summary totals {sum(result.verification.values())}, "
+    # Gap 10 added `exact`/`approximate`, which are a SECOND VIEW of a subset of
+    # `verified`, not more findings. The invariant is about the locating
+    # counts, and `locating_total` is the one place that rule is written.
+    from screenplay_analyzer.verifier import locating_total
+    assert locating_total(result.verification) == len(result.findings), (
+        f"verification_summary totals {locating_total(result.verification)}, "
         f"report carries {len(result.findings)}")
 
 
