@@ -3535,3 +3535,61 @@ styling at all — a bold in a PDF still does not arrive. Non-numeric scene numb
 ("12A") are a separate loss: `scene_number` is typed `int` and is load-bearing
 for undo, redo and the knowledge graph, so re-typing it was deliberately not
 bundled into this change.
+
+## §84 — Gap 65: most of what I promised to build already existed (2026-11-08)
+
+**Reverts: 1 / 3 / 1 / 1 / 3.** 7 tests.
+
+Before writing anything I read the publish path, and found that the plan I had
+sold the user one message earlier was mostly already built:
+
+- `publish_generation` already re-reads the live draft and refuses if the digest
+  moved — gap 4 built that;
+- `manifest._merge_manifest` already stops an in-flight run from resurrecting a
+  stale `active_draft`: it only takes a writer's value for a field that writer
+  actually changed.
+
+Had I implemented "C1: stamp a digest, compare at publish, refuse", I would have
+written code that already existed and reported it as progress. The estimate I
+gave ("half a day for the export side, several days for the whole") was not
+wrong so much as mis-addressed — I was costing a design without reading the one
+that shipped.
+
+What was actually open, and it is a familiar shape:
+
+```
+try:    live_digest = document_digest(load_working(m))
+except: live_digest = None
+if live_digest is not None and man['digest'] != live_digest: raise
+```
+
+**An unreadable draft skipped the check and published anyway.** "I could not
+verify" was read as "verified". This register has now found that same inversion
+four times — gap 6's unwritable log, gap 22's "the format can't", gap 93's
+missing denominator, and here. It is the dominant failure mode of the code in
+this repository: a guard whose failure path is permissive, so the guard is
+absent exactly when the system is unhealthy.
+
+A second, quieter defect sat next to it. Publication joined each source to
+`gen_dir` but looked the live paths up on the project, then **skipped a missing
+artifact while still moving the pointer** — a publication claiming a reading it
+never copied, and a manifest naming a path outside its folder could have copied
+an unrelated project file into the report. Both now refuse.
+
+The find worth keeping: `tests/test_store_fault_injection.py` **was silently
+depending on the fail-open**. Its fixture published a reading for a project with
+no parsed script and no working copy — it only ever worked because an unreadable
+draft made the comparison skip itself. Fifteen minutes after the fix, four tests
+went red not because the fix was wrong but because the fixture had been written
+against a hole. A test that passes only through a defect is a test that will
+defend the defect, and the honest repair was to make the fixture resemble a real
+project rather than to weaken the check.
+
+Still open, and deliberately not marked closed: the 409 that blocks a draft
+switch during a run is a `threading.Lock`, so it is **in-process only** — a CLI
+run and the web UI on one project can still switch under each other — and
+`upload.save()` plus the parse run with no lock held, so a run starting in that
+window sees a half-written document. Binding reports per-draft (the C2 option the
+user did not pick) remains unimplemented. The entry stays NARROWED rather than
+FIXED, because a reader of the register should not have to discover that the
+"refused" in the message is only true within one process.
