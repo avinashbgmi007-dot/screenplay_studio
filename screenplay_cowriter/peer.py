@@ -10,11 +10,58 @@ _QUESTION_START = re.compile(
     r"^(who|what|why|how|does|can|should|is|are|would|could|do|did)\b", re.I
 )
 _DIRECTIVE_START = re.compile(
-    r"^(rewrite|fix|change|try|add|cut|move|remove|make|let'?s|write|imagine|explain)\b", re.I
+    r"^(rewrite|fix|change|try|add|cut|move|remove|make|let'?s|let\s+us|write|imagine|explain)\b",
+    re.I,
 )
 _REASONING = re.compile(
     r"\b(because|since|so that|the reason|my instinct|i feel like|the thing is)\b", re.I
 )
+
+# ---------------------------------------------------------------------------
+# Gap 98: classification keyed on the FIRST TOKEN and a trailing "?", so a
+# writer who said what they wanted was treated as a writer with a raw idea and
+# then interrogated ("why do you think so?"). Measured on the real functions:
+#
+#   "Let the silence sit."                      -> idea -> probed
+#   "I want the audience to feel compulsion."   -> idea -> probed
+#   "I cut the line."                           -> idea -> probed
+#   "The ending should feel earned."            -> idea -> probed
+#
+# Those are decisions, not undeveloped thoughts. Probing them is the failure the
+# brief rules out. Two new kinds carry the distinction, and each has a
+# BEHAVIOUR, not just a label — a kind nothing reads is a comment.
+
+# "Let the silence sit." but not "let's" / "let us" (those are directives).
+_INTENT_START = re.compile(
+    r"^(?:"
+    r"let\s+(?!'s\b|us\b|s\b)"
+    r"|keep\b|allow\b|hold\b|leave\b|preserve\b|stet\b"
+    r"|i'd\s+like|i\s+would\s+like"
+    # Contractions sit directly after the pronoun, so `i\s+` never matched them:
+    # "I've decided" was classified a bare idea until this branch existed.
+    r"|i'(?:ve|m)\s+(?:decided|cut|kept|moved|added|changed|removed|rewritten|trying)"
+    r"|i\s+(?:have|am)\s+(?:decided|cut|kept|moved|added|changed|removed|rewritten|trying)"
+    r"|i\s+(?:want|need|decided|intend|prefer|cut|kept|moved|added|changed|removed|wrote"
+    r"|'m\s+trying|am\s+trying)\b"
+    r")", re.I)
+
+# A statement that names the EFFECT the writer wants: "The ending should feel
+# earned." / "This must read as a betrayal." That is an intention, stated.
+#
+# Deliberately NOT every "should": "Mara should die at the end" is a plot idea
+# offered for development, and two pre-existing tests pin it as probeable —
+# correctly, because a story decision is exactly what a co-writer should help
+# think through. The boundary is effect-vs-event: how the work should FEEL is
+# the writer's intention; what should HAPPEN is the writer's idea.
+_INTENT_STATEMENT = re.compile(
+    r"\b(?:should|must|needs?\s+to|has\s+to|ought\s+to)\s+"
+    r"(?:feel|read|play|land|sound|look|come\s+across|track|sit)\b", re.I)
+
+# Modal + FIRST PERSON = the writer proposing something about their own script,
+# not asking a fact about the world. Narrow on purpose: "Can the mother appear
+# earlier?" stays a question, because that one IS asking for a judgment.
+_REQUEST_START = re.compile(
+    r"^(can|could|would|will|should|may|might)\s+(we|i|you)\b", re.I)
 
 PROBE_SYSTEM_PROMPT = (
     "You are Sameer, the writer's co-writing partner. The writer just shared an idea with "
@@ -27,19 +74,63 @@ PROBE_SYSTEM_PROMPT = (
 
 
 def classify_turn(text: str) -> str:
-    """'idea' | 'question' | 'directive'
-    - idea: a statement sharing a thought
-    - question: ends with ? or starts with who/what/why/how/does/can/should/...
+    """'idea' | 'question' | 'directive' | 'intent' | 'request'
+
+    - idea: a thought offered for development — the ONLY kind that gets probed
+    - question: a fact/world question — answer first, then at most one follow-up
     - directive: an instruction (imperative) — 'rewrite', 'fix', 'try', ...
+    - intent: the writer said what they want or what they did — never probed
+    - request: a modal first-person proposal — engaged with, never nudged
+
+    Order matters. `request` is checked before the trailing-"?" catch, because
+    "Could I lose the last beat?" is a proposal that happens to end in a
+    question mark; `question` before `intent`, so "Should the mother appear
+    earlier?" is not read as a decision; and `directive` before `intent`, so
+    "Let's cut the scene" is an instruction while "Let the silence sit." is the
+    writer's intention.
     """
     t = (text or "").strip()
     if not t:
         return "idea"
+    if _REQUEST_START.match(t):
+        return "request"
     if t.endswith("?") or _QUESTION_START.match(t):
         return "question"
     if _DIRECTIVE_START.match(t):
         return "directive"
+    if _INTENT_START.match(t) or _INTENT_STATEMENT.search(t):
+        return "intent"
     return "idea"
+
+
+# What the reply must do first, per turn kind. Pure, so the contract is testable
+# without a model call — the engine used to build this inline, which meant the
+# only way to know what a writer would be told was to read the prompt.
+_OPENING_CONTRACTS = {
+    "question": (
+        "\n\nANSWER FIRST: the writer asked a direct question. Open with "
+        "the actual answer to THAT question -- no preamble, no redirect. "
+        "After the answer, at most one short follow-up."
+    ),
+    "request": (
+        "\n\nREQUEST FIRST: the writer proposed something about their own "
+        "script. Engage with the proposal as a collaborator would -- what it "
+        "would cost, what it would buy, what it would need -- and answer the "
+        "yes/no they are actually asking. Do not interrogate them about why "
+        "they asked, and do not treat it as a fact question about the world."
+    ),
+    "intent": (
+        "\n\nTHE WRITER HAS DECIDED: they told you what they want or what "
+        "they did. Take it as given. Do not ask what is driving it -- they "
+        "already said. Build on it, name what it would change, or say what it "
+        "risks; do not re-open the decision."
+    ),
+}
+
+
+def opening_contract(turn_kind: str) -> str:
+    """The lead-the-reply instruction for a turn kind ("" for idea/directive)."""
+    return _OPENING_CONTRACTS.get(turn_kind, "")
 
 
 def has_embedded_reasoning(text: str) -> bool:
@@ -50,7 +141,14 @@ def has_embedded_reasoning(text: str) -> bool:
 
 
 def should_probe(text: str) -> bool:
-    """Probe only when the writer shares an idea WITHOUT embedded reasoning."""
+    """Probe only when the writer shares an idea WITHOUT embedded reasoning.
+
+    Gap 98: this is now the whole of the rule, because `intent` and `request`
+    are no longer classified as `idea`. The brief says Sameer must not
+    interrogate a writer who has already said what they want or asked
+    something — so the classification carries that, and this predicate stops
+    needing a growing list of exceptions.
+    """
     return classify_turn(text) == "idea" and not has_embedded_reasoning(text)
 
 
@@ -112,7 +210,10 @@ def ensure_forward_momentum(reply: str, turn_kind: str, persona: str | None = No
         return reply
     if persona not in NUDGE_PERSONAS:
         return reply
-    if turn_kind == "question":
+    if turn_kind in ("question", "request"):
+        # Both are the writer asking US something. Tacking "want me to run with
+        # this?" onto the answer reads as evasive — and gap 98 added `request`
+        # to this rule because a modal proposal is still a request for an answer.
         return reply
     # The nudge list is English. Appending an English question to a reply the
     # language mirror just kept in Telugu or Hindi is the ENGINE breaking the

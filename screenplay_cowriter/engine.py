@@ -442,7 +442,7 @@ class CoWriterEngine:
     def send_message(self, session: Session, user_text: str, quote: dict | None = None,
                      on_token=None) -> str:
         from .peer import (
-            classify_turn, should_probe, PROBE_SYSTEM_PROMPT,
+            classify_turn, should_probe, opening_contract, PROBE_SYSTEM_PROMPT,
             ensure_forward_momentum, cap_suggestions,
         )
         branch = session.branch
@@ -464,13 +464,10 @@ class CoWriterEngine:
         # Answer-first contract: when the writer asked a DIRECT question, the
         # reply must open with the answer -- probing/redirecting first reads
         # as evasive. One short follow-up at most.
-        answer_first = ""
-        if turn_kind == "question":
-            answer_first = (
-                "\n\nANSWER FIRST: the writer asked a direct question. Open with "
-                "the actual answer to THAT question -- no preamble, no redirect. "
-                "After the answer, at most one short follow-up."
-            )
+        # Gap 98: the contract per turn kind lives in peer.opening_contract, so
+        # what a writer is told is testable without a model call — and so a new
+        # kind cannot be added without deciding what the reply must do first.
+        answer_first = opening_contract(turn_kind)
 
         was_pending = branch.awaiting_probe
         if was_pending:
