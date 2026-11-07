@@ -3744,3 +3744,47 @@ Not claimed: nothing here makes the analysis better at *judging* findings. The
 gap closed is epistemic honesty — the surfaces no longer imply a check that does
 not exist. An argument-level verifier remains absent, and the register now says
 so in the entry rather than leaving a reader to infer otherwise.
+
+## §88 — Gap 11: one claim was right about the number and wrong about the silence (2026-11-08)
+
+**Reverts: 1 / 2 / 3 / 2 / 3.** 8 tests across two files, plus 4 pre-existing
+suites re-run as the narrowings' safety net.
+
+Three of this entry's six claims were code, and I fixed those. The other three
+are **explicitly not fixed**, and the register row now says so rather than
+letting a "FIXED" stamp imply the whole entry closed:
+
+- **The grounding number was true; the diagnosis was not.** The entry said the
+  character fragment "omitted 30 of 83 selected rules", and that is exactly
+  right — 83 selected, 53 admitted, 30 shed by the 40,000-char default. But it
+  read as a silent-drop bug, and it is not: `_render_budgeted` has always
+  appended "(30 further craft principles omitted…)" to the prompt, with a test
+  protecting it. **This is the fifth filed fix in this register that was already
+  partly done** (§85's lesson, still holding). Had I "fixed" it without running
+  the fragment, I would have added a second disclosure of the same fact and
+  called it a gap closed.
+
+  The real defect is one level out, and it is the *writer's* side: the model was
+  told what was shed, the writer never was. Worse, what is shed is the
+  **lowest-confidence tier** — so a defect whose only principle was shed was
+  never looked for, and its absence reads as a clean bill of health. That is a
+  distortion of feedback, which is what this entry is actually about.
+
+- **My first placement was wrong in a way only a test caught.** I put the
+  disclosure inside "Detailed Analysis", which is skipped when there are no
+  findings — so the run that most needs "a missing note is not proof" printed
+  nothing about it. It is now above that section, unconditional.
+
+- **Two narrowings, and both needed the old positives re-run.** Making "however"
+  require an adversative partner broke the sentential case (`; however, the
+  script shows…`); making a subtitle mention require an accessibility demand
+  broke "without clear separation or translation", where the demand spans four
+  words. Both were caught by pre-existing tests, not by my new ones — a
+  reminder that a narrowing's real test suite is the one written before it.
+
+**What I refused to do:** invent consistency between the differing severity
+tiers for similar voice checks. The entry lists three inventory problems —
+tier disagreement, absent related-rule ids, requirement/input mismatch — and all
+three are judgements about *editorial intent* in the KB, not behaviour I can
+verify from code. Picking tiers myself would replace a known inconsistency with
+an unknown authority. They stay open, named, with a reason.
