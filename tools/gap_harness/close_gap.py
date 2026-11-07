@@ -275,6 +275,14 @@ def _critique_section(number: int) -> str:
         return ""
     text = CRITIQUE.read_text(encoding="utf-8")
     sections = re.split(r"\n## §", text)
+    # Prefer a section whose HEADING names this gap. Falling straight to "any
+    # mention" picked a much older section that merely talked about gap 6 in
+    # passing, so the revert counts and the reasoning in the real section were
+    # invisible to the gate. Most recent heading wins.
+    head = [sec for sec in sections
+            if re.match(rf"\d+\s*—\s*Gaps?\s+.*\b{number}\b", sec)]
+    if head:
+        return head[-1]
     for sec in sections:
         # "Gap 44" or "Gaps 44 + 77": a combined section covers both numbers.
         if re.search(rf"Gaps?\s+.*\b{number}\b", sec):
@@ -286,7 +294,13 @@ def _plan_entry(number: int) -> str:
     if not PLAN.exists():
         return ""
     text = PLAN.read_text(encoding="utf-8")
+    # Two shapes, both real: 15+ are `**N. paragraph**`, 1-14 are table rows.
+    # Reading only the paragraph form left `plan_entry` empty for the table, so
+    # the FIXED-tail check failed a gap whose tail was right there in the row.
     m = re.search(rf"^\*\*{number}\. .*$", text, re.M)
+    if m:
+        return m.group(0)
+    m = re.search(rf"^\| \*\*{number}\*\* \|.*$", text, re.M)
     return m.group(0) if m else ""
 
 
@@ -329,7 +343,13 @@ def run_check(number: int, run_suite: bool = True, run_tests: bool = True) -> Ch
     # Duplicate plan entries — the bug that once added 336 lines.
     if PLAN.exists():
         plan_text = PLAN.read_text(encoding="utf-8")
-        count = len(re.findall(rf"^\*\*{number}\. ", plan_text, re.M))
+        # Entries 1-14 are table rows (`| **6** | ... |`); 15+ are `**N. ...**`
+        # paragraphs. Counting only the paragraph form reported "found 0" for a
+        # gap that is right there in the table, so both forms are counted and a
+        # plan holding one of either is a single entry.
+        count = max(
+            len(re.findall(rf"^\*\*{number}\. ", plan_text, re.M)),
+            len(re.findall(rf"^\| \*\*{number}\*\* \|", plan_text, re.M)))
         c.require(count == 1, f"plan has exactly one entry {number}", f"found {count}")
 
     # --- 3. tests that exist ---------------------------------------------

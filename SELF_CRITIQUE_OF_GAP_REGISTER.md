@@ -3427,3 +3427,51 @@ vellipothadu"* — are intentions this classifier will still read as ideas and p
 The brief's rule holds for those turns regardless of language; the mechanism does
 not. Routing non-English turns away from the probe is the honest fix, not more
 regex, and that is a different gap.
+
+## §82 — Gap 6: three of my six reverts proved nothing (2026-11-08)
+
+The fix looked finished at "the suite is green and the behaviour reproduces".
+It was not. **Reverts: 1 / 1 / 2 / 1 / 1 / 2** — and on the first measurement
+three of the six stayed green:
+
+```
+R1 journal written after the document  -> 9 passed   (wrong)
+R2 rollback disabled                   -> 9 passed   (wrong)
+R5 journal kept after a clean refusal  -> 9 passed   (wrong)
+```
+
+Each is a different blind spot, and none was visible from the test names:
+
+- **R1** was never observed. The tests asserted the *outcome* of an interrupted
+  apply; the journal's position is an *order*. Order has to be watched from
+  inside the write — `ScriptDocument.save` asking whether the journal exists —
+  not inferred from an outcome a later repair also produces.
+- **R2** was masked by the safety net added in the same change. With the
+  rollback disabled the divergence marker did its job and the next read rebuilt
+  the copy correctly, so the document read back looked right. The rollback's
+  promise is narrower than the net's: agreement **on disk at the moment the
+  writer is told the edit failed**. The test now reads the raw file, because the
+  ordinary reader repairs what it observes.
+- **R5** failed the same way one level up: the test read the text *before*
+  asking for the repair report, and a read IS the repair, so the stranded
+  journal had already been consumed when the assertion looked.
+
+The generalisable lesson, and why this deserves a section: **a fix that
+includes a repair path is unusually good at hiding its own defects.** Every
+layer added for safety turns a broken lower layer into a slightly slower
+correct result. Fine for the product, terrible for the tests. The only defence
+found here is to assert each layer's promise at that layer's own boundary — the
+file, not the document; the report, not the repaired text; the order, not the
+outcome.
+
+Two smaller costs: `ensure_working` refreshes the copy on its own schedule, so
+any fault injection that counts writes spends its allowance on a write the test
+never meant to target (the helper now matches the pending bytes instead); and
+`tests/test_lock_order.py` correctly refused the two new stores until the P1-3
+topology table declared them as leaves, which is the guard working as designed.
+
+Not done: the trio is still not transactional across a power cut — the journal
+makes the interruption *detectable and repairable*, not atomic. A write that
+lands between the journal and the document leaves no copy of the old text, so
+the repair reconstructs from the parsed script plus the log; a writer who typed
+by hand outside the cycle loses that typing. Stated, not fixed.
