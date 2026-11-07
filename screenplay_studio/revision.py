@@ -373,6 +373,80 @@ def set_finding_intent(m, finding_id: str, intent) -> None:
 _VERDICTS = ("correct", "partial", "incorrect")
 
 
+# ---------- gap 12: claim identity, where identity actually collides ----------
+# The id is quote + place + category, which is what makes a verdict SURVIVE a
+# re-analysis (the model re-words `issue` constantly, so hashing the claim would
+# orphan every mark on every run — tests/test_finding_verdict_channel.py pins
+# that property, and it is worth more than what follows).
+#
+# But two findings can share that id while asserting OPPOSITE things about the
+# same line in the same scene, and then one verdict covers both: the writer
+# cannot disagree with one without disagreeing with the other.
+#
+# The fix is therefore conditional, not a re-keying:
+#   * ids are unchanged, so every existing store keeps working;
+#   * ONLY where a report actually contains a colliding id is the store key
+#     extended with the claim (`<id>~c<hash>`), giving each row its own verdict;
+#   * a verdict stored under the bare id before the collision appeared is shown
+#     as AMBIGUOUS rather than applied to both — applying it to both is the bug,
+#     and discarding it would throw away a judgment the writer really made.
+#     The writer confirms, once, which row they meant.
+
+def _claim_key(f: dict) -> str:
+    """The finding's claim, normalised for a hash tie-breaker."""
+    return " ".join((f.get("issue") or "").lower().split())[:120]
+
+
+def claim_scoped_finding_id(f: dict) -> str:
+    """`compute_finding_id` extended with the claim — the key used ONLY where
+    ids collide, so an unambiguous report keeps its existing keys."""
+    claim = _claim_key(f)
+    if not claim:
+        return compute_finding_id(f)
+    return compute_finding_id(f) + "~c" + _base36(_str_hash(claim))
+
+
+def finding_store_keys(findings: list) -> list:
+    """The store key for each finding, in order.
+
+    A key is claim-scoped only when another finding in the SAME report shares
+    its plain id. Everything else keeps the plain id, byte for byte, so a
+    verdict written before this existed still resolves.
+    """
+    rows = [f if isinstance(f, dict) else {} for f in findings or []]
+    plain = [compute_finding_id(f) for f in rows]
+    counts: dict = {}
+    for pid in plain:
+        counts[pid] = counts.get(pid, 0) + 1
+    return [claim_scoped_finding_id(f) if counts[pid] > 1 else pid
+            for f, pid in zip(rows, plain)]
+
+
+def resolve_verdict(f: dict, verdicts: dict, collides: bool = False) -> tuple:
+    """(verdict|None, ambiguous|None) for one finding.
+
+    `ambiguous` is the bare-id verdict that could belong to either row of a
+    collision. It is reported, never applied: the writer's mark is preserved as
+    history and shown as a question, which is the only honest state for "a
+    judgment exists and we do not know which of these two it was about".
+    """
+    # `finding_verdicts()` already filters to real verdicts; callers passing a
+    # raw store must get the same discipline, or junk in the file surfaces as a
+    # judgment.
+    verdicts = {k: v for k, v in (verdicts or {}).items() if v in _VERDICTS}
+    scoped = claim_scoped_finding_id(f)
+    pid = compute_finding_id(f)
+    if scoped in verdicts:                      # this row was judged directly
+        return verdicts[scoped], None
+    if pid in verdicts:
+        if collides:
+            # A judgment exists and its target is unknowable. Shown as a
+            # question, never applied to both rows and never discarded.
+            return None, {"finding_id": pid, "verdict": verdicts[pid]}
+        return verdicts[pid], None
+    return None, None
+
+
 def finding_verdicts_path(m) -> str:
     return os.path.join(m.project_dir, "finding_verdicts.json")
 

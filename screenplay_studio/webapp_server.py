@@ -4224,6 +4224,46 @@ def set_finding_intent_route(name):
 # capability token) and every store invariant holds by construction.
 
 
+def _claim_key_payload(m: ProjectManifest) -> dict:
+    """Gap 12: per-row verdict keys for the CURRENT report, plus any verdict
+    whose target cannot be known.
+
+    A collision is a property of the report, not of the store, so it cannot be
+    derived client-side from `finding_verdicts` alone. Served beside the
+    verdicts so the desk reads one payload.
+
+    Best-effort on purpose: an unreadable report must never take down the
+    verdicts fetch. With no report there is nothing to collide.
+    """
+    from .revision import (compute_finding_id, finding_store_keys,
+                           finding_verdicts, resolve_verdict)
+    try:
+        rows = _load_report_sanitized(m).get("findings") or []
+    except Exception:
+        # No readable report => nothing to collide. This is the ONLY best-effort
+        # step. A bare `except` around the WHOLE body was how a NameError in
+        # here first presented itself as "no collisions", which is
+        # indistinguishable from the healthy case — so the catch stops at the
+        # read and everything after it is allowed to be loud.
+        return {"finding_claim_keys": [], "ambiguous_verdicts": {}}
+    verdicts = finding_verdicts(m)
+    keys = finding_store_keys(rows)
+    counts: dict = {}
+    for f in rows:
+        if isinstance(f, dict):
+            pid = compute_finding_id(f)
+            counts[pid] = counts.get(pid, 0) + 1
+    ambiguous: dict = {}
+    for f in rows:
+        if not isinstance(f, dict):
+            continue
+        _v, amb = resolve_verdict(
+            f, verdicts, collides=counts.get(compute_finding_id(f), 0) > 1)
+        if amb:
+            ambiguous[amb["finding_id"]] = amb["verdict"]
+    return {"finding_claim_keys": keys, "ambiguous_verdicts": ambiguous}
+
+
 @app.route("/api/projects/<name>/findings/verdicts", methods=["GET"])
 def get_finding_verdicts(name):
     """The writer's truth verdicts: {finding_id: correct|partial|incorrect}.
@@ -4233,7 +4273,13 @@ def get_finding_verdicts(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     from .revision import finding_verdicts
-    return jsonify({"verdicts": finding_verdicts(m)})
+    body = {"verdicts": finding_verdicts(m)}
+    # Gap 12: which store key each finding in the current report uses. A plain
+    # id unless that id is shared by findings asserting different things, in
+    # which case each row gets its own key -- one verdict cannot answer two
+    # opposite claims.
+    body.update(_claim_key_payload(m))
+    return jsonify(body)
 
 
 @app.route("/api/projects/<name>/findings/verdict", methods=["POST"])
