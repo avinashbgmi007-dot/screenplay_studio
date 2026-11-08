@@ -518,6 +518,9 @@
           <button id="bb-save-btn" class="btn-primary">Save order</button>
         </div>
       </div>
+      <!-- Gap 20: a stale board used to render identically to a current one.
+               This is where the difference is said out loud. -->
+      <div id="bb-stale-notice" class="bb-stale-notice" style="display:none;" role="status"></div>
       <!-- R6-UX-5: NOT a live region. `renderBeatboard()` empties this node and
                re-appends every card on each move, so as `aria-live="polite"` it
                read the whole board back for one drag — the same trap the

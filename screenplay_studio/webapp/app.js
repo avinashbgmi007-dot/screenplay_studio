@@ -8988,6 +8988,7 @@ function updateRevisionStatus() {
 let bbOrder = [];       // the working (possibly unsaved) order
 let bbCards = [];       // card data keyed by scene_number
 let bbDirty = false;
+let bbStale = null;
 
 let bbPrevRoom = "cowrite";
 
@@ -9032,7 +9033,17 @@ async function loadBeatboard() {
   bbOrder = data.order.slice();
   bbCards = data.cards;
   bbDirty = false;
+  bbStale = data.stale ? data : null;
   renderBeatboard();
+  renderBeatboardStaleNotice();
+}
+
+function renderBeatboardStaleNotice() {
+  const node = $("#bb-stale-notice");
+  if (!node) return;
+  const text = beatboardStaleNotice(bbStale);
+  node.style.display = text ? "block" : "none";
+  node.textContent = text;
 }
 
 function bbCardByNumber(num) {

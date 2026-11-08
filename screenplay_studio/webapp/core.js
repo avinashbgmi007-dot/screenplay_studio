@@ -392,6 +392,28 @@ function unloadFlushUsesKeepalive(payload) {
 }
 
 // ---- Node test hook (browsers never take this branch) ----
+// Gap 20: the board the writer saved can stop fitting the script (a re-parse
+// renumbered the scenes, or scene 3 became a different scene entirely). The
+// server draws the natural order in that case and refuses to export. This words
+// the notice; it lives here rather than in app.js so it can be tested without a
+// browser, and it is written to say what is TRUE: the saved arrangement is
+// kept, not lost.
+function beatboardStaleNotice(state) {
+  if (!state || !state.stale) return "";
+  const why = state.stale_reason || "the script changed since this board was saved";
+  const changed = (state.changed_scenes || []).filter((n) => typeof n === "number");
+  const which = changed.length
+    ? " Scenes affected: " + changed.slice(0, 8).join(", ")
+      + (changed.length > 8 ? "\u2026" : "") + "."
+    : "";
+  // "kept" is load-bearing: the read that detected the mismatch never rewrites
+  // beatboard.json, and a notice that implied otherwise would make the writer
+  // redo work the app still has.
+  return "Your saved order no longer fits this script \u2014 " + why + "." + which
+    + " You are seeing the script\u2019s own order; the arrangement you saved is "
+    + "kept and has not been changed. Re-arrange and save to reconcile it.";
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     fuzzyScore,
@@ -416,5 +438,6 @@ if (typeof module !== "undefined" && module.exports) {
     cancellationNote,
     isCancelledAck,
     isStopRace,
+    beatboardStaleNotice,
   };
 }

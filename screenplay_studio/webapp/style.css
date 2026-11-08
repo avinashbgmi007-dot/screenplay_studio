@@ -6554,3 +6554,18 @@ body:not(.idea-mode) .desk {
 .recovery-damage { margin: 6px 0; font-size: 11.5px; color: #8a6d3b; font-family: monospace; }
 .recovery-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .recovery-close { background: none; border: 1px solid #ccc; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+
+/* Gap 20: a stale beat board used to be indistinguishable from a current one.
+   The notice sits above the cards, uses the same warning accent as the other
+   "this is not what you think it is" banners, and is never the only signal —
+   the board itself shows the script's real order underneath it. */
+.bb-stale-notice {
+  margin: 0 0 12px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--warn-border, #b5811f);
+  background: var(--warn-bg, rgba(181, 129, 31, 0.10));
+  color: var(--text, inherit);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
