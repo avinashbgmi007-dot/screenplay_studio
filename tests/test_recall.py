@@ -63,7 +63,8 @@ def test_reveal_candidates_reach_report_json_and_markdown():
     payload = report_mod.to_findings_json(r)
     assert payload["reveal_candidates"] == r.reveal_candidates
     md = report_mod.render_markdown(r)
-    assert "Story mechanics" in md and "It was a dream." in md
+    assert "Story mechanics to consider" in md and "It was a dream." in md
+    assert "contrary findings" in md
 
 
 class _TwistClient:
@@ -73,9 +74,13 @@ class _TwistClient:
         self.reply = reply
         self.exc = exc
         self.calls = 0
+        self.last_system = None
+        self.last_user = None
 
     def chat_json(self, system, user, **kw):
         self.calls += 1
+        self.last_system = system
+        self.last_user = user
         if self.exc is not None:
             raise self.exc
         return self.reply
@@ -96,14 +101,18 @@ def test_confirm_twist_skips_call_without_candidates():
     assert client.calls == 0, "candidate-gated: no scan hit means no model call"
 
 
-def test_confirm_twist_parses_trailing_json():
+def test_confirm_twist_parses_json_and_grounds_location_from_quote():
     from screenplay_analyzer.reveal_scan import confirm_twist
     client = _TwistClient(reply={
         "twist": True, "scene": 2,
         "line": "It was a dream.", "kind": "dream"})
     verdict = confirm_twist(_twist_doc(), client)
-    assert verdict == {"twist": True, "scene": 2,
-                       "line": "It was a dream.", "kind": "dream"}
+    assert verdict == {
+        "twist": True, "scene": 1, "line": "It was a dream.",
+        "kind": "dream", "status": "interpretation",
+        "coverage": {"scope": "full_script", "characters_sent": 81,
+                     "script_characters": 81},
+    }
 
 
 def test_confirm_twist_false_and_garbage_yield_none():
@@ -115,9 +124,9 @@ def test_confirm_twist_false_and_garbage_yield_none():
     assert confirm_twist(_twist_doc(), garb) is None
     prose = _TwistClient(reply='Some thinking.\n{"twist": true, "scene": 2,'
                               ' "line": "It was a dream.", "kind": "dream"}')
-    assert confirm_twist(_twist_doc(), prose) == {
-        "twist": True, "scene": 2,
-        "line": "It was a dream.", "kind": "dream"}
+    verdict = confirm_twist(_twist_doc(), prose)
+    assert verdict is not None and verdict["scene"] == 1
+    assert verdict["status"] == "interpretation"
 
 
 def test_confirm_twist_model_error_yields_none():
@@ -126,53 +135,115 @@ def test_confirm_twist_model_error_yields_none():
     assert confirm_twist(_twist_doc(), client) is None
 
 
-def test_impossible_scene_number_is_kept_honest():
-    """Trial acceptance: the model confirmed the dream but cited scene 4 of
-    a 3-scene script. Keep the verdict (detection is the valuable part),
-    drop the false precision — never print a scene that does not exist."""
+def test_wrong_model_scene_is_replaced_by_quote_location():
+    # A model's scene number is not authoritative; exact source text locates it.
     from screenplay_analyzer.reveal_scan import confirm_twist
     client = _TwistClient(reply={"twist": True, "scene": 99,
                                  "line": "It was a dream.", "kind": "dream"})
     verdict = confirm_twist(_twist_doc(), client)
     assert verdict is not None and verdict["twist"] is True
-    assert verdict["scene"] is None
-
-
-def test_confirmed_twist_with_null_scene_is_kept():
-    """Autopsy 2026-10-13: 7/8 live probes confirmed the dream; the null
-    came from scene:null (location hedge), which the parser rejected.
-    Every stored verdict carries scene None anyway — accept it."""
-    from screenplay_analyzer.reveal_scan import confirm_twist
-    client = _TwistClient(reply={"twist": True, "scene": None,
-                                 "line": "He wakes up.", "kind": "dream"})
-    assert confirm_twist(_twist_doc(), client) == {
-        "twist": True, "scene": None,
-        "line": "He wakes up.", "kind": "dream"}
-
-
-def test_non_int_scene_is_still_rejected():
-    """Null is a hedge; a string scene is garbage — the bar stays."""
-    from screenplay_analyzer.reveal_scan import parse_twist_verdict
-    assert parse_twist_verdict({"twist": True, "scene": "three",
-                                "line": "He wakes up.", "kind": "dream"}) is None
-
-
-def test_unrelated_cited_line_falls_back_to_candidate():
-    """Live 8-probe finding: 3 confirmations cited an unrelated beat.
-    The deterministic candidate replaces the model's pick."""
-    from screenplay_analyzer.reveal_scan import confirm_twist
-    client = _TwistClient(reply={"twist": True, "scene": 2,
-                                 "line": "He writes the article.",
-                                 "kind": "dream"})
-    verdict = confirm_twist(_twist_doc(), client)
-    assert verdict is not None and verdict["twist"] is True
-    assert verdict["line"] == "Raj wakes. It was a dream."
     assert verdict["scene"] == 1
 
 
+def test_null_scene_can_be_recovered_from_exact_quote():
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    client = _TwistClient(reply={"twist": True, "scene": None,
+                                 "line": "It was a dream.", "kind": "dream"})
+    verdict = confirm_twist(_twist_doc(), client)
+    assert verdict is not None and verdict["scene"] == 1
+    assert verdict["status"] == "interpretation"
+
+
+def test_fabricated_keyword_citation_is_rejected_not_replaced():
+    # A reveal keyword is not proof that a cited line exists in the script.
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    client = _TwistClient(reply={"twist": True, "scene": 1,
+                                 "line": "It was all a dream and the city vanished.",
+                                 "kind": "dream"})
+    assert confirm_twist(_twist_doc(), client) is None
+
+
+def test_ordinary_dream_metaphor_hypothetical_and_ambiguous_quotes_stay_provisional():
+    # Grounding verifies the words, not whether a dream phrase is literal plot.
+    from screenplay_analyzer.reveal_scan import confirm_twist, confirmed_twist_block
+    lines = [
+        "MAYA dreams of a better job. It was a dream she had at lunch.",
+        "MAYA calls the promotion 'It was a dream' as a metaphor for its ease.",
+        "She says, 'It was a dream if the promotion happened,' but is speculating.",
+        "MAYA wakes. It was a dream, perhaps; the ending leaves it unresolved.",
+    ]
+    for line in lines:
+        doc = _Doc()
+        doc.scenes = [_Scene(1, [line])]
+        client = _TwistClient(reply={"twist": True, "scene": 1,
+                                     "line": line, "kind": "dream"})
+        verdict = confirm_twist(doc, client)
+        block = confirmed_twist_block(verdict)
+        assert verdict is not None and verdict["status"] == "interpretation"
+        assert "not an established fact" in block
+        assert "contrary findings" in block
+        assert "suspect" not in block.lower()
+
+
+def test_prefix_probe_reports_coverage_and_only_accepts_quote_in_prefix():
+    from screenplay_analyzer.reveal_scan import confirm_twist, confirmed_twist_block
+    doc = _Doc()
+    doc.scenes = [_Scene(1, ["MAYA dreams. It was a dream."]),
+                  _Scene(2, ["LATER: " + "x" * 9200, "Beyond budget line."])]
+    client = _TwistClient(reply={"twist": True, "scene": 1,
+                                 "line": "It was a dream.", "kind": "dream"})
+    verdict = confirm_twist(doc, client)
+    assert verdict is not None
+    assert verdict["coverage"]["scope"] == "prefix"
+    assert verdict["coverage"]["script_characters"] > verdict["coverage"]["characters_sent"]
+    assert "later text has not been assessed" in client.last_user.lower()
+    assert "later text was not assessed" in confirmed_twist_block(verdict).lower()
+
+    late = _TwistClient(reply={"twist": True, "scene": 2,
+                               "line": "Beyond budget line.",
+                               "kind": "dream"})
+    assert confirm_twist(doc, late) is None
+
+
+def test_non_int_scene_is_still_rejected():
+    """Null is a hedge; strings and booleans are not scene numbers."""
+    from screenplay_analyzer.reveal_scan import parse_twist_verdict
+    assert parse_twist_verdict({"twist": True, "scene": "three",
+                                "line": "He wakes up.", "kind": "dream"}) is None
+    assert parse_twist_verdict({"twist": True, "scene": True,
+                                "line": "He wakes up.", "kind": "dream"}) is None
+
+
+def test_unrelated_real_quote_is_rejected_not_replaced_by_candidate():
+    # An authentic but unrelated line is not evidence for a twist; preserve the
+    # independent deterministic cue rather than substituting it into a verdict.
+    from screenplay_analyzer.reveal_scan import confirm_twist, scan_reveals
+    client = _TwistClient(reply={"twist": True, "scene": 2,
+                                 "line": "He writes the article.",
+                                 "kind": "dream"})
+    assert confirm_twist(_twist_doc(), client) is None
+    assert scan_reveals(_twist_doc())[0]["line"] == "Raj wakes. It was a dream."
+
+
+def test_overlong_quote_is_rejected_before_truncation():
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    client = _TwistClient(reply={"twist": True, "scene": 1,
+                                 "line": " " * 185 + "It was a dream." + " invented" * 30,
+                                 "kind": "dream"})
+    assert confirm_twist(_twist_doc(), client) is None
+
+
+def test_duplicate_quote_uses_model_scene_only_if_that_scene_matches():
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    doc = _Doc()
+    doc.scenes = [_Scene(1, ["It was a dream."]), _Scene(2, ["It was a dream."])]
+    client = _TwistClient(reply={"twist": True, "scene": 2,
+                                 "line": "It was a dream.", "kind": "dream"})
+    verdict = confirm_twist(doc, client)
+    assert verdict is not None and verdict["scene"] == 2
+
+
 def test_matching_cited_line_is_kept():
-    """A citation that matches the candidate (or carries twist vocabulary)
-    is the model's to keep."""
     from screenplay_analyzer.reveal_scan import confirm_twist
     client = _TwistClient(reply={"twist": True, "scene": 2,
                                  "line": "It was a dream.",
@@ -180,18 +251,23 @@ def test_matching_cited_line_is_kept():
     verdict = confirm_twist(_twist_doc(), client)
     assert verdict is not None
     assert verdict["line"] == "It was a dream."
+    assert verdict["scene"] == 1
 
 
-def test_confirmed_block_replaces_candidate_block():
-    from screenplay_analyzer.reveal_scan import confirmed_twist_block
+def test_twist_block_is_provisional_and_does_not_suppress_candidates():
+    from screenplay_analyzer.reveal_scan import confirmed_twist_block, reveal_context_block
     assert confirmed_twist_block(None) == ""
     assert confirmed_twist_block({"twist": False}) == ""
     block = confirmed_twist_block({"twist": True, "scene": 3,
                                    "line": "It was a dream.", "kind": "dream"})
-    assert "CONFIRMED" in block and "Scene 3" in block
+    candidates = reveal_context_block([{"scene": 1, "line": "A dream."}])
+    assert "not an established fact" in block and "Scene 3" in block
+    assert "suspect" not in block.lower()
+    assert "Possible story-mechanic cues" in candidates
+    assert "do not dismiss a finding" in candidates
 
 
-def test_twist_verdict_reaches_report_json_and_markdown():
+def test_twist_interpretation_reaches_report_json_and_markdown():
     import os
     from screenplay_parser import parse_fountain
     from screenplay_analyzer.pipeline import AnalysisResult
@@ -199,12 +275,19 @@ def test_twist_verdict_reaches_report_json_and_markdown():
     fixture = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            "fixtures", "pain_tenglish.fountain")
     r = AnalysisResult(parse_fountain(fixture))
-    r.twist_verdict = {"twist": True, "scene": 3,
-                       "line": "It was a dream.", "kind": "dream"}
+    r.twist_verdict = {
+        "twist": True, "scene": 3, "line": "It was a dream.",
+        "kind": "dream", "status": "interpretation",
+        "coverage": {"scope": "prefix", "characters_sent": 9000,
+                     "script_characters": 12000},
+    }
     payload = report_mod.to_findings_json(r)
     assert payload["twist_verdict"] == r.twist_verdict
     md = report_mod.render_markdown(r)
-    assert "confirmed twist" in md.lower() and "It was a dream." in md
+    assert "Possible reading: reality twist" in md
+    assert "not an established fact" in md and "It was a dream." in md
+    assert "later text was not assessed" in md
+    assert "Confirmed twist" not in md
 
 
 DREAM_DOC = """Title: Twist Test
@@ -235,12 +318,16 @@ def test_pipeline_sets_twist_verdict_on_dream_doc(tmp_path):
     doc = parse_fountain(path)
 
     class TwistClient:
+        def __init__(self):
+            self.calls = []
+
         def resolve_model(self):
             return "mock"
 
         def chat_json(self, system, user, grammar=None, max_tokens=0,
                       temperature=0.0, **kw):
-            if "reality-twist" in system:
+            self.calls.append((system, user))
+            if system.startswith("You are offering one possible reading"):
                 return {"twist": True, "scene": 2,
                         "line": "It was a dream.", "kind": "dream"}
             if "ummar" in system.lower():
@@ -249,9 +336,18 @@ def test_pipeline_sets_twist_verdict_on_dream_doc(tmp_path):
                     for s in doc.scenes]}
             return {"findings": []}
 
-    result = P.analyze(doc, TwistClient(), run_categories=("theme",),
+    client = TwistClient()
+    result = P.analyze(doc, client, run_categories=("theme",),
                        progress_cb=None)
-    assert result.twist_verdict == {"twist": True, "scene": 2,
-                                    "line": "It was a dream.", "kind": "dream"}
+    assert result.twist_verdict["twist"] is True
+    assert result.twist_verdict["scene"] == 2
+    assert result.twist_verdict["line"] == "It was a dream."
+    assert result.twist_verdict["status"] == "interpretation"
+    assert result.twist_verdict["coverage"]["scope"] == "full_script"
     assert any("dream" in str(c.get("match", "")).lower()
                for c in result.reveal_candidates)
+    category_prompts = [system for system, _user in client.calls
+                        if "Possible story-mechanic cues" in system]
+    assert category_prompts
+    assert "Model-suggested reality-twist reading" in category_prompts[0]
+    assert "not an established fact" in category_prompts[0]

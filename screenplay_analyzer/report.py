@@ -393,29 +393,25 @@ def render_markdown(result: AnalysisResult) -> str:
                 lines.append(f"  - {note}")
             lines.append("")
 
-    # --- Story mechanics (deterministic reveal scan) ---
+    # --- Story mechanics (deterministic scan and separate model reading) ---
     if getattr(result, "reveal_candidates", None):
-        lines.append("## Story mechanics worth a second look")
+        lines.append("## Story mechanics to consider")
         lines.append(
-            "*Single lines that may flip the story's meaning (a dream, a "
-            "waking, a death undone). Found by text scan, not judgment — "
-            "check them against the pages before believing any finding that "
-            "contradicts one.*"
+            "*Text-scan cues, not judgments: a line may be an ordinary dream, "
+            "metaphor, hypothetical, or something else. Keep other readings "
+            "and any contrary findings for the writer to assess.*"
         )
         lines.append("")
         for c in result.reveal_candidates:
             lines.append(f"- Scene {c.get('scene')}: '{c.get('line', '')}'")
         lines.append("")
 
-    # --- Confirmed twist (candidate-gated probe call) ---
+    # --- Provisional model interpretation; never a confirmed story fact ---
     twist = getattr(result, "twist_verdict", None)
     if isinstance(twist, dict) and twist.get("twist") is True:
-        lines.append("## Confirmed twist — read everything after it twice")
-        lines.append(
-            f"A direct probe confirmed a {twist.get('kind', 'twist')} in "
-            f"Scene {twist.get('scene')}: '{twist.get('line', '')}'. Findings "
-            "that treat those events as literal waking-plot are suspect."
-        )
+        from .reveal_scan import confirmed_twist_block
+        lines.append("## Possible reading: reality twist")
+        lines.append(confirmed_twist_block(twist))
         lines.append("")
 
     # --- Pacing (deterministic per-scene pace index) ---
@@ -778,8 +774,9 @@ def to_findings_json(result: AnalysisResult) -> dict:
         # threaded into prompts) so the desk, the eval runner, and any reader
         # can see what the scan found — an unserialized scan is a silent one.
         "reveal_candidates": list(getattr(result, "reveal_candidates", None) or []),
-        # Twist confirmation verdict (candidate-gated probe call). None unless
-        # confirmed — served so the desk and eval can see the verdict.
+        # Backward-compatible field name: this is only a grounded, provisional
+        # model interpretation. Its status and inspected-text coverage travel
+        # with it so consumers cannot mistake it for an established fact.
         "twist_verdict": getattr(result, "twist_verdict", None),
         "character_dials": result.character_dials,
         "pacing": result.pacing,

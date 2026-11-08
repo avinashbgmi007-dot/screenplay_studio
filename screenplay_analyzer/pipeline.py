@@ -1566,8 +1566,11 @@ def analyze(
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
                 from .reveal_scan import reveal_context_block, confirmed_twist_block
-                _reveal_block = confirmed_twist_block(result.twist_verdict) \
-                    or reveal_context_block(result.reveal_candidates)
+                _reveal_blocks = [
+                    reveal_context_block(result.reveal_candidates),
+                    confirmed_twist_block(result.twist_verdict),
+                ]
+                _reveal_block = "\n\n".join(block for block in _reveal_blocks if block)
                 if _reveal_block:
                     rules_fragment = (rules_fragment + "\n\n" + _reveal_block) if rules_fragment else _reveal_block
                 all_findings.extend(_tag_evidence(

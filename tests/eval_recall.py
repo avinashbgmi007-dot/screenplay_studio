@@ -99,9 +99,9 @@ def _anchor_hit(anchor: str, texts: list[str]) -> tuple[bool, str]:
 
 
 def _search_texts(report: dict) -> list[str]:
-    """Finding prose plus the twist channel: a confirmed twist reaches the
-    writer through twist_verdict/reveal_candidates, not through a finding
-    (trial 8: no finding says "dream", the verdict does) — recall that
+    """Finding prose plus the twist channel: a possible twist reading reaches
+    the writer through twist_verdict/reveal_candidates, not through a finding
+    (trial 8: no finding says "dream", the model reading does) — recall that
     ignores it measures wording luck, not what the report delivers."""
     texts = [_norm(f"{f.get('issue', '')} {f.get('observation', '')} "
                    f"{f.get('why_it_matters', '')} {f.get('evidence_quote', '')}")
@@ -118,7 +118,7 @@ def _search_texts(report: dict) -> list[str]:
     if isinstance(tv, dict):
         texts.append(_norm(f"{tv.get('kind', '')} {tv.get('line', '')}"))
         if tv.get("twist"):
-            texts.append("twist confirmed")
+            texts.append("possible reality twist interpretation")
     for c in report.get("reveal_candidates") or []:
         if isinstance(c, dict):
             texts.append(_norm(str(c.get("line", ""))))
