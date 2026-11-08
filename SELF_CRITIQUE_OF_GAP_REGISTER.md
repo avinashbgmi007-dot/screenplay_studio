@@ -3862,3 +3862,41 @@ The recovery is not an apology: the patch and its tests went in on the next two
 calls, and the sandbox reset partway through destroyed the local history, which
 only mattered because the work was already committed to origin. Commit early is
 not tidiness; it is the only thing that survives.
+
+## §91 — Gap 25: right about the defect, wrong about where to fix it (2026-11-08)
+
+**Reverts: 5 / 4 / 1 / 2 / 1 / 1 / 2.** 14 tests driving the real `parse_pdf`
+against real PDF bytes.
+
+The filed defect is real and reproduced exactly: page 1 extracts, page 2 is ink
+with no text layer, page 2 is `continue`d away, and completeness is judged
+**globally** — page 1 satisfies the check, so the parse looks whole. The unit of
+judgment is now the page, OCR is scoped to the pages that need it, and
+`page_coverage` puts total/blank/recovered/unread/read/complete on the document
+(and through save/load) so "we read 1 of 2 pages" is a number, not a flag.
+
+**The part I got wrong was placement, and it cost six tests in one run.** For the
+entry's second half I made `run_parse` raise when a parse produced zero scenes.
+That is the intuitive place — the stage said `complete`, the truth was "nothing
+read", so make the stage tell the truth. But the upload route *already* handles a
+sceneless file better than I was about to: it rejects with a 400, a specific
+explanation and a directory cleanup, all of which run AFTER `run_parse`. My raise
+preempted it and turned a careful 400 into a 500. And draft switching depends on
+a failed parse being recorded and restored from a snapshot sidecar; changing what
+`run_parse` does on empty changed the restore.
+
+Narrowing to "zero scenes AND a parser error" did not save it either: the
+fountain parser reports "No scene headings detected" as an **error**, so every
+sceneless upload still tripped the gate. A guard that fires on a case somebody
+else handles better is not a guard, it is an interception. The gate now sits in
+front of the analyze route, which is where the filed risk actually is — the
+analysis of an unread script — and nothing else changed.
+
+**Two of my own tests were worthless, and I only found out by reverting.** R3
+removed the OCR page filter and the suite stayed green, because my fake
+`_ocr_extract` was page-blind and my assertion was about what `parse_pdf`
+*passes*, not what OCR *does*. R5 removed `page_coverage` from serialization and
+the suite stayed green, because every assertion read the object the parser had
+just returned. Both now drive the real function against fakes that record what
+happens. A test that cannot fail is worse than no test: it certifies nothing and
+buys silence.

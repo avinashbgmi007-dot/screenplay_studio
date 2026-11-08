@@ -221,3 +221,146 @@ class TestAnUnreadParseIsNotAnalysed:
         reason = __import__("screenplay_studio.webapp_server", fromlist=["x"]
                             )._unread_parse_reason(m)
         assert reason is None
+
+
+class TestTheCoverageRecordSurvivesTheRoundTrip:
+
+    def test_page_coverage_is_saved_and_loaded(self, tmp_path, monkeypatch):
+        # R5 revert survived because the record was only ever asserted in the
+        # object the parser just returned. It is worthless if it does not reach
+        # disk: the desk reads the SAVED parse.
+        from screenplay_parser.models import ScriptDocument
+
+        monkeypatch.setattr(pdf_parser, "_get_ocr_engine", lambda *a, **k: None)
+        pdf = _image_only_page_pdf(tmp_path / "mixed.pdf")
+        doc = pdf_parser.parse_pdf(pdf)
+        path = str(tmp_path / "parsed.json")
+        doc.save(path)
+        back = ScriptDocument.load(path)
+        assert back.page_coverage is not None, (
+            "page coverage was lost on save -- the desk never sees it")
+        assert back.page_coverage["pages_unread"] == [2]
+        assert back.page_coverage["complete"] is False
+
+    def test_a_fully_read_pdf_round_trips_without_inventing_coverage(self, tmp_path):
+        from screenplay_parser.models import ScriptDocument
+
+        pdf = _text_pdf(tmp_path / "clean.pdf", [PAGE_ONE])
+        doc = pdf_parser.parse_pdf(pdf)
+        path = str(tmp_path / "parsed.json")
+        doc.save(path)
+        back = ScriptDocument.load(path)
+        # None is "no paginated read was needed"; asserting `complete: true` here
+        # would be inventing a check nobody ran.
+        assert back.page_coverage is None or back.page_coverage["complete"] is True
+
+
+class TestOcrIsScopedToThePagesThatNeedIt:
+
+    def test_ocr_never_touches_a_page_whose_text_layer_worked(self, tmp_path, monkeypatch):
+        # R3 survived because the fake OCR was page-blind, so "OCR everything"
+        # looked identical to "OCR the gap". This fake records the pages it is
+        # ALLOWED to render and fails if a readable page is included.
+        pdf = _image_only_page_pdf(tmp_path / "mixed.pdf")
+        monkeypatch.setattr(pdf_parser, "_get_ocr_engine", lambda *a, **k: "ocr")
+        rendered = []
+
+        def strict_ocr(path, engine, pages=None):
+            rendered.append(pages)
+            assert pages == {2}, f"OCR was asked to read {pages}, not just the gap"
+            return ["INT. KITCHEN - DAY", "", "Mara sits at the table."]
+
+        monkeypatch.setattr(pdf_parser, "_ocr_extract", strict_ocr)
+        doc = pdf_parser.parse_pdf(pdf)
+        assert rendered == [{2}]
+        assert doc.page_coverage["pages_recovered_by_ocr"] == [2]
+
+
+class TestThePageFilterActuallyFilters:
+
+    def test_ocr_renders_only_the_pages_it_was_given(self, tmp_path, monkeypatch):
+        """The `pages` argument is enforced inside `_ocr_extract`, so a fake
+        `_ocr_extract` cannot test it -- the previous version of this file
+        asserted what parse_pdf PASSES, not what OCR DOES, and a revert that
+        removed the filter entirely still passed. This drives the real function
+        against a fake pdfium that records every page it renders.
+        """
+        import sys as _sys
+        import types
+
+        rendered = []
+
+        class _Bitmap:
+            def to_pil(self):
+                import io as _io
+                buf = _io.BytesIO()
+                from PIL import Image
+                Image.new("RGB", (4, 4), "white").save(buf, format="PNG")
+                return buf
+
+        class _Page:
+            def __init__(self, n):
+                self.n = n
+
+            def render(self, scale=1):
+                rendered.append(self.n)
+                return _Bitmap()
+
+        class _Doc:
+            def __init__(self, path):
+                pass
+
+            def __len__(self):
+                return 3
+
+            def __getitem__(self, i):
+                return _Page(i + 1)
+
+        fake = types.SimpleNamespace(PdfDocument=_Doc)
+        monkeypatch.setitem(_sys.modules, "pypdfium2", fake)
+        # a tiny real PNG is needed only to give the engine a path
+        monkeypatch.setattr(pdf_parser, "_bitmap_to_png_bytes",
+                            lambda b: b"not-a-real-png")
+        lines = pdf_parser._ocr_extract("ignored.pdf", lambda p: "INT. ROOM - DAY",
+                                        pages={2})
+        assert rendered == [2], (
+            f"OCR rendered pages {rendered}; only the requested page was allowed")
+        assert any("INT. ROOM - DAY" in ln for ln in lines)
+
+    def test_with_no_page_argument_every_page_is_rendered(self, tmp_path, monkeypatch):
+        import sys as _sys
+        import types
+
+        rendered = []
+
+        class _Bitmap:
+            def to_pil(self):
+                import io as _io
+                buf = _io.BytesIO()
+                from PIL import Image
+                Image.new("RGB", (4, 4), "white").save(buf, format="PNG")
+                return buf
+
+        class _Page:
+            def __init__(self, n):
+                self.n = n
+
+            def render(self, scale=1):
+                rendered.append(self.n)
+                return _Bitmap()
+
+        class _Doc:
+            def __init__(self, path):
+                pass
+
+            def __len__(self):
+                return 2
+
+            def __getitem__(self, i):
+                return _Page(i + 1)
+
+        monkeypatch.setitem(_sys.modules, "pypdfium2",
+                            types.SimpleNamespace(PdfDocument=_Doc))
+        monkeypatch.setattr(pdf_parser, "_bitmap_to_png_bytes", lambda b: b"x")
+        pdf_parser._ocr_extract("ignored.pdf", lambda p: "text")
+        assert rendered == [1, 2]
