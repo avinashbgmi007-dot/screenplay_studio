@@ -1,21 +1,13 @@
-"""The same defect filed under related rules becomes one finding (§5 item 3).
+"""Cross-rule finding dedup, constrained by explicit claim/evidence identity.
 
-Measured on a real report (`gun_pen_2`, scene 2), one on-the-nose exposition problem
-arrived as THREE findings under `On-the-Nose Dialogue vs. Subtext`,
-`Say the Opposite` and `Exposition as Ammunition` — while a fourth dialogue finding
-in the same scene, `Distinct Character Voice`, is a genuinely different defect.
-
-Two measured facts shaped the implementation, and both rule out the obvious
-approach. They are pinned here because each cost a wrong implementation:
-
-1. **Text similarity finds nothing.** Across all 36 findings no pair reached 0.19
-   similarity, so a text-based dedup is a no-op. What separates the trio from the
-   voice finding is the knowledge base.
-2. **The transitive closure of `related_rules` is far too coarse.** It collapses 271
-   rules into clusters of up to 61, and puts `distinct_character_voice` in the SAME
-   cluster as `on_the_nose_vs_subtext`. The first implementation used it and merged
-   36 findings down to 10, swallowing the voice finding. The merge predicate is
-   therefore a DIRECT edge, evaluated only between findings present and in one scene.
+A historical real report showed the useful candidate case: one on-the-nose
+exposition problem was filed under three related rules, while a fourth voice
+finding in the same scene was a different defect. That motivates using the KB,
+but not merging on scene or relation alone. The current contract requires the
+same scene, same/directly-related rules, exact non-empty quote, matching category
+and scene key, and normalized issue/observation identity. These tests cover the accepted merge,
+independent findings that must remain separately countable/addressable, and the
+old transitive-closure failure mode.
 """
 
 import copy
@@ -27,6 +19,7 @@ from screenplay_analyzer.dedupe import (
     SEVERITY_ORDER, _by_name, dedupe_related_findings, directly_related, related_map,
     resolve_rule_key,
 )
+from screenplay_studio.revision import compute_finding_id
 
 
 @pytest.fixture(scope="module")
@@ -42,9 +35,13 @@ EXPOSITION = "Exposition as Ammunition, Not Data Dump"
 VOICE = "Distinct Character Voice"
 
 
-def _f(rule, scene, severity="medium", issue="an issue"):
+def _f(rule, scene, severity="medium", issue="a shared claim",
+       evidence_quote="the same quoted line", observation="the same observation",
+       why_it_matters="because"):
     return {"category": "dialogue", "rule_id": rule, "severity": severity,
-            "issue": issue, "why_it_matters": "because", "scene_refs": [scene]}
+            "issue": issue, "observation": observation,
+            "evidence_quote": evidence_quote, "why_it_matters": why_it_matters,
+            "scene_refs": [scene]}
 
 
 # --------------------------------------------------------------------------
@@ -139,11 +136,38 @@ class TestRuleReferenceResolution:
 # --------------------------------------------------------------------------
 
 class TestTheMerge:
-    def test_the_exposition_trio_collapses_to_one(self, kb):
-        findings = [_f(ON_THE_NOSE, 2), _f(SAY_OPPOSITE, 2), _f(EXPOSITION, 2)]
+    def test_related_rules_with_distinct_claims_in_one_scene_stay_separate(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, issue="states devotion", evidence_quote="I love you."),
+            _f(SAY_OPPOSITE, 2, issue="contradicts an earlier claim",
+               evidence_quote="I never said that."),
+            _f(EXPOSITION, 2, issue="delivers background exposition",
+               evidence_quote="We met at school."),
+        ]
+        out = dedupe_related_findings(findings, kb)
+        assert len(out) == 3
+        assert all("merged_findings" not in f for f in out)
+
+    def test_same_claim_and_exact_quote_under_related_rules_still_merge(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, issue="The line says, she trusts him!",
+               observation="Mira sounds certain."),
+            _f(SAY_OPPOSITE, 2, issue="the line says she trusts him",
+               observation="mira sounds certain"),
+        ]
         out = dedupe_related_findings(findings, kb)
         assert len(out) == 1
-        assert sorted(out[0]["merged_rule_ids"]) == sorted([SAY_OPPOSITE, EXPOSITION])
+        assert out[0]["merged_rule_ids"] == [SAY_OPPOSITE]
+        assert out[0]["merged_findings"][0]["evidence_quote"] == "the same quoted line"
+
+    def test_quote_case_or_punctuation_variants_keep_verdict_addresses(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, evidence_quote="I love you."),
+            _f(SAY_OPPOSITE, 2, evidence_quote="I love you!"),
+        ]
+        out = dedupe_related_findings(findings, kb)
+        assert len(out) == 2
+        assert len({compute_finding_id(f) for f in out}) == 2
 
     def test_the_voice_finding_is_NOT_swallowed(self, kb):
         """The load-bearing case. A closure-based merge takes this one too — the
@@ -161,11 +185,39 @@ class TestTheMerge:
         findings = [_f(ON_THE_NOSE, 2), _f(ON_THE_NOSE, 3)]
         assert len(dedupe_related_findings(findings, kb)) == 2
 
-    def test_the_same_rule_twice_in_one_scene_merges(self, kb):
-        findings = [_f(ON_THE_NOSE, 2, issue="first"), _f(ON_THE_NOSE, 2, issue="second")]
+    def test_same_rule_different_claims_in_one_scene_stay_separate(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, issue="Mira says she trusts him",
+               evidence_quote="I trust him completely."),
+            _f(ON_THE_NOSE, 2, issue="Mira says she does not trust him",
+               evidence_quote="I do not trust him."),
+        ]
         out = dedupe_related_findings(findings, kb)
-        assert len(out) == 1
-        assert out[0]["merged_rule_ids"] == [ON_THE_NOSE]
+        assert len(out) == 2  # the primary count and writer-facing rows stay distinct
+        assert [f["issue"] for f in out] == [f["issue"] for f in findings]
+        assert len({compute_finding_id(f) for f in out}) == 2  # separate verdict addresses
+        assert all("merged_findings" not in f for f in out)
+
+    def test_same_quote_with_a_different_claim_stays_separate(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, issue="the line expresses confidence"),
+            _f(SAY_OPPOSITE, 2, issue="the line expresses sarcasm"),
+        ]
+        assert len(dedupe_related_findings(findings, kb)) == 2
+
+    def test_different_observations_on_the_same_quote_stay_separate(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, observation="Mira sounds certain."),
+            _f(SAY_OPPOSITE, 2, observation="Mira sounds sarcastic."),
+        ]
+        assert len(dedupe_related_findings(findings, kb)) == 2
+
+    def test_missing_evidence_never_merges_even_when_claims_match(self, kb):
+        findings = [
+            _f(ON_THE_NOSE, 2, evidence_quote=None),
+            _f(SAY_OPPOSITE, 2, evidence_quote=None),
+        ]
+        assert len(dedupe_related_findings(findings, kb)) == 2
 
     def test_a_finding_with_no_scene_is_never_merged(self, kb):
         """Script-level findings carry no scene_refs; merging them by rule alone
@@ -198,8 +250,12 @@ class TestWhatTheSurvivorKeeps:
         assert out[0]["rule_id"] == SAY_OPPOSITE
 
     def test_a_tie_keeps_the_earliest_for_stable_order(self, kb):
-        findings = [_f(ON_THE_NOSE, 2, issue="first"), _f(SAY_OPPOSITE, 2, issue="second")]
-        assert dedupe_related_findings(findings, kb)[0]["issue"] == "first"
+        findings = [
+            _f(ON_THE_NOSE, 2, why_it_matters="first rationale"),
+            _f(SAY_OPPOSITE, 2, why_it_matters="second rationale"),
+        ]
+        assert dedupe_related_findings(findings, kb)[0]["why_it_matters"].startswith(
+            "first rationale")
 
     def test_the_scene_refs_are_unioned(self, kb):
         a = _f(ON_THE_NOSE, 2)
@@ -226,23 +282,25 @@ class TestWhatTheSurvivorKeeps:
         previously retained nowhere (measured: 23 on Pain_3, 6 on gun_pen), so a
         merge announced a claim it had already thrown away. Same contract as the
         integrity gate's `withdrawals` ledger: the content survives the removal."""
-        findings = [_f(ON_THE_NOSE, 2, issue="the survivor"),
-                    _f(SAY_OPPOSITE, 2, severity="high", issue="the absorbed claim")]
+        findings = [_f(ON_THE_NOSE, 2, why_it_matters="survivor rationale"),
+                    _f(SAY_OPPOSITE, 2, severity="high",
+                       why_it_matters="absorbed rationale")]
         out = dedupe_related_findings(findings, kb)
-        # highest severity survives, so the MEDIUM one is what got absorbed
-        assert out[0]["issue"] == "the absorbed claim"
+        # highest severity survives, so the MEDIUM rationale is what got absorbed
+        assert out[0]["issue"] == "a shared claim"
         absorbed = out[0]["merged_findings"]
         assert len(absorbed) == 1, f"the absorbed finding's content is gone: {absorbed}"
-        assert absorbed[0]["issue"] == "the survivor"
+        assert absorbed[0]["issue"] == "a shared claim"
+        assert absorbed[0]["why_it_matters"] == "survivor rationale"
         assert absorbed[0]["rule_id"] == ON_THE_NOSE
         assert absorbed[0]["severity"] == "medium"
 
     def test_the_absorbed_content_is_a_copy_not_a_live_reference(self, kb):
-        findings = [_f(ON_THE_NOSE, 2, issue="a"),
-                    _f(SAY_OPPOSITE, 2, severity="high", issue="b")]
+        findings = [_f(ON_THE_NOSE, 2, why_it_matters="first rationale"),
+                    _f(SAY_OPPOSITE, 2, severity="high", why_it_matters="second rationale")]
         out = dedupe_related_findings(findings, kb)
-        out[0]["merged_findings"][0]["issue"] = "mutated"
-        assert findings[0]["issue"] == "a", (
+        out[0]["merged_findings"][0]["why_it_matters"] = "mutated"
+        assert findings[0]["why_it_matters"] == "first rationale", (
             "the survivor holds a live reference to the caller's finding")
 
     def test_a_finding_that_absorbed_nothing_carries_no_merged_findings(self, kb):

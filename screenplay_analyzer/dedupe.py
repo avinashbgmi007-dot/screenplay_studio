@@ -1,59 +1,27 @@
-"""Cross-rule finding dedup (§5 item 3).
+"""Conservative cross-rule finding deduplication.
 
-The same defect reaches the report more than once when the model files it under
-several related rules. Measured on a real report (`gun_pen_2`, scene 2), one
-on-the-nose exposition problem arrived as THREE findings:
+A rule relation is only a candidate signal, not proof that two findings make
+one claim. Two findings in the same scene may quote different lines, contradict
+each other, or make independently reviewable judgments. This module merges only
+when all of the following hold: same scene, same or directly-related rules,
+non-empty evidence quotes that match exactly after trimming outer whitespace,
+and matching category, scene key, and normalized issue/observation. Claims use
+case/spacing/punctuation normalization only; there is no fuzzy or semantic
+similarity threshold. Exact quote identity is intentional because writer verdict
+IDs hash quote case and punctuation. If the evidence or claim is absent or differs,
+both findings remain separate. Rule relations remain one-hop and symmetric, not
+transitive: the historical KB closure put the unrelated voice rule in the same
+large component and swallowed an independently reviewable finding.
 
-    On-the-Nose Dialogue vs. Subtext   "Dialogue is on-the-nose, explicitly stating..."
-    Say the Opposite                   "Dialogue contains multiple on-the-nose statements..."
-    Exposition as Ammunition           "Dialogue is purely functional exposition..."
-
-and a fourth dialogue finding in the same scene — `Distinct Character Voice` — is a
-genuinely different defect that must NOT be merged with them.
-
-Two measured facts shaped this module, and both rule out the obvious approach:
-
-**1. The duplication is not textually detectable.** Those three issues share almost
-no wording (across the whole 36-finding report, no pair of findings reached 0.19
-text similarity). A text-similarity dedup finds nothing; a scene-only dedup merges
-the voice finding too.
-
-**2. The transitive closure of `related_rules` is far too coarse.** The KB writes
-related-ness one-directionally, so it is symmetrised here — but chaining those edges
-collapses 271 rules into clusters of up to **61 members**, with `cast_polarization`
-alone holding **49**. `distinct_character_voice` and `on_the_nose_vs_subtext` land in
-the SAME one. A closure-based merge therefore merged 36 findings down to 10 and
-swallowed the voice finding — the exact error this module exists to avoid. (That was
-this module's first implementation; the real report caught it.)
-
-So the merge predicate is a **direct edge**, evaluated only between findings that are
-both present and in the same scene:
-
-    merge(A, B)  iff  A and B share a scene
-                 and  B's rule is in A's related_rules (or vice versa)
-
-That is precise where the closure is not: the exposition trio are pairwise linked
-through `on_the_nose_vs_subtext`, while `distinct_character_voice` has no direct edge
-to any of them.
-
-Two consequences, both deliberate:
-
-- **A finding with no scene is never merged.** Script-level findings carry no
-  `scene_refs`; relating them by rule alone would merge observations from different
-  parts of the script. The rule is "we merge only when both findings point at the
-  same page".
-- **Nothing is dropped.** The survivor keeps its own text and gains a
-  `merged_rule_ids` list, a `merged_findings` list carrying each absorbed
-  finding's FULL content, and a stated clause, because a dedup that quietly
-  deletes a finding is the same failure as the one it exists to fix. Same
-  "flag, don't silently drop" policy as the verifier. (`merged_rule_ids` alone
-  is attribution, not content — it names the rules that agreed but not what they
-  said; `merged_findings` is what makes the claim recoverable.)
+A qualifying merge still keeps the complete absorbed finding in
+`merged_findings` and discloses the additional rule attribution. Exact whole-row
+deduplication is a separate pass (`collapse_exact_duplicates`).
 """
 
 from __future__ import annotations
 
 import json
+import re
 
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -134,6 +102,37 @@ def directly_related(adj: dict[str, set[str]], a: str | None, b: str | None) -> 
     return b in adj.get(a, ())
 
 
+def _normalized_identity_text(value) -> str:
+    """Case/spacing/punctuation normalization, deliberately not fuzzy matching."""
+    return " ".join(re.findall(r"\w+", str(value or "").casefold(), flags=re.UNICODE))
+
+
+def _same_claim_and_evidence(a: dict, b: dict) -> bool:
+    """Whether two rows carry the same explicit claim and verdict-addressed quote.
+
+    The quote comparison intentionally stays exact (apart from outer whitespace):
+    `revision.compute_finding_id` hashes quote case and punctuation as-is. Merging
+    quote variants could therefore collapse two independently addressable writer
+    verdicts. A related rule or shared scene alone is not enough; missing evidence
+    or an empty issue cannot establish correspondence.
+    """
+    quote_a = str(a.get("evidence_quote") or "").strip()
+    quote_b = str(b.get("evidence_quote") or "").strip()
+    issue_a = _normalized_identity_text(a.get("issue"))
+    issue_b = _normalized_identity_text(b.get("issue"))
+    if not quote_a or not issue_a:
+        return False
+    return (
+        quote_a == quote_b
+        and issue_a == issue_b
+        and _normalized_identity_text(a.get("observation"))
+        == _normalized_identity_text(b.get("observation"))
+        and (a.get("category") or "other") == (b.get("category") or "other")
+        and str(a.get("scene_key") or "").strip()
+        == str(b.get("scene_key") or "").strip()
+    )
+
+
 class _Union:
     def __init__(self, n):
         self.parent = list(range(n))
@@ -172,10 +171,10 @@ def _copy_finding(f: dict) -> dict:
 
 
 def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
-    """Merge findings that report the same defect under directly-related rules in
-    the same scene. Returns a new list; the input dicts are copied, not mutated.
+    """Merge only same-claim, same-evidence findings under related rules in one scene.
 
-    With no KB available the input is returned unchanged — a dedup that cannot read
+    Returns a new list; input dicts and containers are copied, not mutated. With
+    no KB available the input is returned unchanged — a dedup that cannot read
     the relation map must not guess at what is related.
     """
     if not findings:
@@ -203,9 +202,11 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
         for a in range(len(idxs)):
             for b in range(a + 1, len(idxs)):
                 i, j = idxs[a], idxs[b]
-                # The same rule twice in the same scene is a duplicate by
-                # definition, so it merges whether or not the KB relates the rule
-                # to itself. (directly_related excludes a == b.)
+                # Rule identity/relation is only a candidate signal. Same-rule
+                # rows can be independent claims too; require the identical
+                # non-empty quote and normalized claim before any pair is united.
+                if not _same_claim_and_evidence(findings[i], findings[j]):
+                    continue
                 if keys[i] and keys[i] == keys[j]:
                     union.union(i, j)
                 elif directly_related(adj, keys[i], keys[j]):
