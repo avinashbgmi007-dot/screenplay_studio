@@ -13,6 +13,8 @@ on purpose: the repo has no PDF-writing dependency, and adding one to test a
 parser would be a new failure mode in the build for no coverage.
 """
 
+import os
+
 import pytest
 
 from screenplay_parser import pdf_parser
@@ -157,3 +159,65 @@ class TestTheParseSaysWhatItDidNotRead:
         assert doc.page_coverage["pages_unread"] == [2]
         assert doc.page_coverage["complete"] is False, (
             "OCR returned nothing and the page was counted as read")
+
+
+# ---------------------------------------------------------------- the stage gate
+
+class TestAnUnreadParseIsNotAnalysed:
+    """The second half of the filed entry: a scanned-only PDF with OCR
+    unavailable returned zero scenes and an error-severity warning, while the
+    parse stage was marked `complete`. Analysis was not run in that probe — and
+    that is exactly the state it left available.
+
+    The gate belongs at the ANALYZE boundary, not inside run_parse: a sceneless
+    upload is a legitimate validation failure the upload route already rejects
+    with a 400 and specific guidance, and raising inside run_parse turned that
+    careful 400 into a 500 (two pre-existing tests caught it immediately).
+    """
+
+    def _project_with(self, root, monkeypatch, doc):
+        import screenplay_studio.webapp_server as W
+        from screenplay_studio.manifest import ProjectManifest
+
+        src = root / "scan.fountain"
+        src.write_text("INT. ROOM - DAY\n\nMARA\nHello.\n", encoding="utf-8")
+        m = ProjectManifest.create(str(root / "p"), str(src))
+        m.save()
+        project_name = os.path.basename(m.project_dir)
+        doc.save(m.parsed_path)
+        m.mark_complete("parse", {"parsed": m.parsed_path})
+        monkeypatch.setattr(W, "PROJECTS_DIR", str(root))
+        W.app.config["TESTING"] = True
+        m.project_name = project_name
+        return W.app.test_client(), m
+
+    def test_a_parse_with_no_scenes_is_refused_with_the_parsers_reason(self, tmp_path, monkeypatch):
+        from screenplay_parser.models import ParseWarning, ScriptDocument
+
+        empty = ScriptDocument(title=None, author=None, source_format="pdf",
+                               source_filename="scan.pdf")
+        empty.parse_confidence = "low"
+        empty.warnings.append(ParseWarning(
+            message="no OCR engine is available", severity="error"))
+        client, m = self._project_with(tmp_path, monkeypatch, empty)
+
+        resp = client.post(f"/api/projects/{m.project_name}/analyze")
+        assert resp.status_code == 400, (
+            "an analysis was started on a parse that read zero scenes")
+        assert "no scenes" in resp.get_json()["error"].lower()
+        assert "OCR" in resp.get_json()["error"], (
+            "the refusal does not repeat the parser's own reason")
+
+    def test_a_readable_parse_is_not_refused(self, tmp_path, monkeypatch):
+        from screenplay_parser.models import ScriptDocument
+        from screenplay_parser.models import Scene, Element, ElementType
+
+        doc = ScriptDocument(title="T", author="A", source_format="fountain",
+                             source_filename="scan.fountain")
+        sc = Scene(scene_number=1, heading_raw="INT. ROOM - DAY")
+        sc.elements = [Element(type=ElementType.ACTION, text="Mara waits.")]
+        doc.scenes = [sc]
+        client, m = self._project_with(tmp_path, monkeypatch, doc)
+        reason = __import__("screenplay_studio.webapp_server", fromlist=["x"]
+                            )._unread_parse_reason(m)
+        assert reason is None

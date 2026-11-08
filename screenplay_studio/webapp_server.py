@@ -2453,12 +2453,51 @@ def _draft_switch_in_progress(name: str):
     return None
 
 
+def _unread_parse_reason(m) -> str | None:
+    """Why this project must not be analysed, or None.
+
+    Two states, both of which used to reach the model path:
+
+    - the parse produced ZERO scenes, so there is nothing to analyse; and
+    - the parse produced scenes but its `page_coverage` says some pages were
+      never read (gap 25) — a partial parse. That one is NOT refused: the
+      writer may want the analysis of what was read. It is disclosed instead, by
+      the report and by the stage record.
+
+    Returns the message to show, so the route stays one line and the rule is
+    testable on its own.
+    """
+    try:
+        from screenplay_parser.models import ScriptDocument
+        doc = ScriptDocument.load(m.parsed_path)
+    except Exception:
+        return None   # unreadable parse output: the OLD behaviour, a loud failure later
+    if doc.scenes:
+        return None
+    errors = [w.message for w in doc.warnings
+              if getattr(w, "severity", "") == "error"]
+    detail = (" — " + "; ".join(errors)) if errors else ""
+    return ("This project's parse produced no scenes, so there is nothing to "
+            "analyse. Re-parse the file" + detail)
+
+
 @app.route("/api/projects/<name>/analyze", methods=["POST"])
 def analyze_project(name):
     try:
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+
+    # Gap 25: refuse to analyse a parse that read NOTHING. The pipeline already
+    # appends "Document has no parsed scenes" and returns — but the run then
+    # publishes an empty report and the analyze stage can read as a finished
+    # one, so the writer gets "analysis complete" for a script the parser never
+    # read. The filed case is a scanned PDF with no OCR engine. Answering 400
+    # with the parser's own sentences makes the stage status and the truth
+    # agree, instead of one contradicting the other.
+    unread = _unread_parse_reason(m)
+    if unread:
+        return _error(unread, 400)
 
     lock = _analyze_lock(name)
     if not lock.acquire(blocking=False):
