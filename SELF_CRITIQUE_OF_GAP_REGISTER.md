@@ -3986,3 +3986,40 @@ load / default the manifest to on / omit the actual-scope preview / skip saving
 the writer's choice). Each revert made its corresponding regression test fail.
 The full system-prompt test also fails if the provider gate is removed: it
 captures the assembled prompt, not merely the digest callback.
+
+## §94 — Gap 32: reasoning is not the reply, and the stream is not the record (2026-11-02)
+
+**Reverts: 1 / 1 / 1 / 1 / 1.** Six focused tests in
+`tests/test_hidden_reasoning_is_never_a_chat_reply.py`; the old H7 fallback test
+was changed because it asserted the unsafe behavior.
+
+**The existing test was the first thing to distrust.** H7 explicitly required
+`reasoning_content` as a fallback answer. It had been put there to fix empty
+reasoning-model replies when `enable_thinking` was left on. But the client already
+disables thinking; if the provider still returns no `content`, the honest
+behavior is to say there was no final answer — not to relabel a field called
+`reasoning_content` as user-facing. Both blocking and streaming clients now
+ignore that field. Streaming passes only `content` to the caller; both paths
+raise rather than return an empty/whitespace answer if no final content exists.
+
+**Why I did not buffer every token:** this is a slow-model co-writing desk; the
+existing product choice was immediate streaming for perceived latency. Buffering
+all output until the guards finish would silently change that behavior, and this
+gap supplied no latency evidence that justified the trade. Instead, the UI names
+the streamed text as a **draft** and says the final reply replaces it. The final
+SSE event carries the stored, cleaned history; on success the browser paints that
+history, not its raw token accumulator. On error the pending bubble is replaced,
+not left looking like a completed answer.
+
+**What the tests establish:** synthetic stream frames containing only
+`reasoning_content` never reach the callback and fail explicitly; mixed frames
+show only `content`; successful completion still returns the collected content.
+These are transport tests with fakes, not evidence that any real provider leaked
+reasoning. The UI test pins the provisional label and the final-history render
+contract in source, but no Chromium binary was available for a browser-level DOM
+assertion of the transition. That is a weaker check and stays named as such; do
+not claim the browser badge was visually verified.
+
+**Reverts:** restoring the blocking fallback, restoring the streaming fallback,
+removing the empty-stream error, removing the empty blocking error, and removing
+the provisional browser cue each fail one focused regression test.

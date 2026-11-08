@@ -5,10 +5,9 @@ scene block + quote context + few-shot examples + post-history voice reminder).
 This llama-server build returns HTTP 500 on any payload with 2+ system messages.
 The co-writer must send at most ONE system message.
 
-H7b. The co-writer's chat client never sets `chat_template_kwargs.enable_thinking`
-and reads only `message.content`. A reasoning model returns `content: ""` with the
-reply in `reasoning_content`. The co-writer must set enable_thinking=False and fall
-back to `reasoning_content` when `content` is empty.
+H7b. The co-writer sets `chat_template_kwargs.enable_thinking=False`. If a model
+still returns empty final `content` plus `reasoning_content`, that field is not a
+user-facing answer: the client must refuse it rather than leak it.
 """
 from __future__ import annotations
 
@@ -78,7 +77,7 @@ def test_first_turn_has_single_system_message():
 
 
 # --------------------------------------------------------------------------
-# H7b — thinking disabled + reasoning_content fallback
+# H7b — thinking disabled; never expose reasoning_content as the answer
 # --------------------------------------------------------------------------
 
 def _client_with_response(monkeypatch, response_payload):
@@ -112,13 +111,16 @@ def test_chat_sets_enable_thinking_false(monkeypatch):
     assert captured["payload"]["chat_template_kwargs"]["enable_thinking"] is False
 
 
-def test_chat_falls_back_to_reasoning_content_when_content_empty(monkeypatch):
+def test_chat_refuses_reasoning_content_when_final_content_is_empty(monkeypatch):
+    import pytest
+    from screenplay_cowriter.llm_client import LlamaServerError
+
     c, _ = _client_with_response(monkeypatch, {
         "choices": [{"finish_reason": "length",
                      "message": {"role": "assistant", "content": "",
-                                 "reasoning_content": "the real reply"}}]})
-    out = c.chat([{"role": "user", "content": "hi"}])
-    assert out == "the real reply"
+                                 "reasoning_content": "private chain of thought"}}]})
+    with pytest.raises(LlamaServerError, match="no final answer"):
+        c.chat([{"role": "user", "content": "hi"}])
 
 
 def test_chat_stream_sets_enable_thinking_false(monkeypatch):

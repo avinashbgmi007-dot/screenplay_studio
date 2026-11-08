@@ -343,6 +343,16 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry
     sink = el("span", "stream-text");
     bubble.insertBefore(sink, bubble.querySelector(".elapsed"));
   }
+  // These are final-content tokens, but they're still raw: cleaning, register
+  // checks and storage happen after the generation completes. Say so in the
+  // bubble while they stream. The caller replaces this pending bubble with the
+  // server's cleaned `messages` on `done`; failures replace it with an error.
+  if (!bubble.querySelector(".stream-provisional")) {
+    const provisional = el("span", "stream-provisional",
+      "Streaming draft · final reply replaces this");
+    provisional.setAttribute("role", "status");
+    bubble.insertBefore(provisional, bubble.querySelector(".elapsed"));
+  }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buf = "", final = null, sseError = null;

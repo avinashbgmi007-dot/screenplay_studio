@@ -4634,11 +4634,11 @@ def preview_chat_clear(name):
 
 
 def _sse_chat_stream(engine, session, store, text, quote, manifest=None, on_success=None):
-    """Shared generator behind both streaming chat routes. Raw model tokens
-    stream to the browser as they arrive (perceived-latency win on slow local
-    models); the FINAL event carries the cleaned, stored reply + full message
-    history, so what gets persisted is byte-identical to the non-streaming
-    path — streaming changes how a reply appears, never what is kept."""
+    """Shared generator behind both streaming chat routes. Final-content tokens
+    stream to the browser provisionally (hidden reasoning is rejected by the
+    client); the FINAL event carries the cleaned, stored reply + full message
+    history. The UI replaces the provisional draft with that authoritative
+    history, so streaming changes when text appears, never what is kept."""
     q = queue.Queue()
     result = {}
     t0 = time.time()

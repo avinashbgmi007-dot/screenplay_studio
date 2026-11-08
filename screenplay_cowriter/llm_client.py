@@ -112,19 +112,26 @@ class LlamaServerClient(BaseLlamaClient):
 
         try:
             msg = data["choices"][0]["message"]
+            # `reasoning_content` is not an answer. Some servers expose internal
+            # reasoning there even when `content` is empty; rendering it as a
+            # reply leaks a field the client cannot establish is user-facing.
+            # Only the protocol's final `content` is eligible for display/store.
             content = msg.get("content")
-            if not content:
-                # Reasoning model: the reply landed in reasoning_content instead.
-                content = msg.get("reasoning_content") or ""
+            if not isinstance(content, str) or not content.strip():
+                raise LlamaServerError(
+                    "The model returned no final answer in its content field. "
+                    "Hidden reasoning was not shown; check the model template or retry."
+                )
             return content
         except (KeyError, IndexError) as e:
             raise LlamaServerError(f"Unexpected response shape from llama-server: {data}") from e
 
     def chat_stream(self, messages: list[dict], on_token, max_tokens: int = 900, temperature: float = 0.7,
                     repeat_penalty: float | None = None) -> str:
-        """Streaming variant of chat(): calls `on_token(piece)` for each text
-        chunk as it arrives (SSE from llama-server's OpenAI-compat endpoint)
-        and returns the FULL raw text once the stream completes.
+        """Streaming variant of chat(): calls `on_token(piece)` for each final
+        `content` chunk as it arrives (SSE from llama-server's OpenAI-compat
+        endpoint) and returns the complete final-content text. `reasoning_content`
+        is ignored; a stream with no final content raises `LlamaServerError`.
 
         No busy-retry loop here (a stream that starts has committed — a busy
         server fails fast and the caller can retry the turn)."""
@@ -175,13 +182,18 @@ class LlamaServerClient(BaseLlamaClient):
                     continue  # keep-alive comment or partial frame — skip
                 choices = obj.get("choices") or [{}]
                 delta = choices[0].get("delta") or {}
+                # Never fall back to `reasoning_content`: it is not the final
+                # answer field and must not be sent to the browser callback.
                 piece = delta.get("content")
-                if not piece:
-                    # Reasoning model streaming: text arrives under reasoning_content.
-                    piece = delta.get("reasoning_content")
-                if piece:
+                if isinstance(piece, str) and piece:
                     parts.append(piece)
                     on_token(piece)
         finally:
             resp.close()
-        return "".join(parts)
+        answer = "".join(parts)
+        if not answer.strip():
+            raise LlamaServerError(
+                "The model stream contained no final answer in its content field. "
+                "Hidden reasoning was not shown; check the model template or retry."
+            )
+        return answer

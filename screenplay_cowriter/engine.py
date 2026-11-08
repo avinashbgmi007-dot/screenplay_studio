@@ -265,10 +265,11 @@ class CoWriterEngine:
     TRAIT_DEPTH = 6              # trait re-injection position from the end
 
     def _generate(self, messages, on_token=None):
-        """One chat completion. With on_token, raw pieces stream to the caller
-        as they arrive (the perceived-latency win for slow local models); the
-        returned full RAW text feeds the exact same hygiene pipeline either
-        way — streaming changes how a reply APPEARS, never what gets stored.
+        """One chat completion. With on_token, final-content pieces stream to
+        the caller provisionally as they arrive (the perceived-latency win for
+        slow local models); the returned full text feeds the same hygiene
+        pipeline either way — streaming changes when a draft appears, never
+        what gets stored.
         Clients without chat_stream (test fakes, older callers) fall back to
         the blocking call."""
         if on_token is not None and hasattr(self.client, "chat_stream"):

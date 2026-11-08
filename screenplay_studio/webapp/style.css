@@ -6572,3 +6572,5 @@ body:not(.idea-mode) .desk {
 
 /* Project-scoped consent has no meaning in the separate idea room. */
 body.idea-mode #shelf-sharing-btn { display: none; }
+
+.stream-provisional { display: block; margin-top: var(--sp-2); color: var(--text-faint); font: 500 var(--fs-xs)/1.4 var(--font-mono); letter-spacing: .01em; }
