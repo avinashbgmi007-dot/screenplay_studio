@@ -208,12 +208,15 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
 
 def cmd_chat(args):
     store = SessionStore(args.sessions_dir)
+    is_new = False
 
     if args.resume:
         session = store.load(args.resume)
     elif args.new:
-        session = store.create(title=args.new, report_path=args.report, script_path=args.script)
+        from .models import Session
+        session = Session.new(title=args.new, report_path=args.report, script_path=args.script)
         session.server_url = args.server
+        is_new = True
     else:
         print("ERROR: specify --new <title> or --resume <session_id>", file=sys.stderr)
         sys.exit(1)
@@ -230,9 +233,16 @@ def cmd_chat(args):
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
+    if is_new:
+        session = store.create(title=session.title, report_path=session.report_path,
+                               script_path=session.script_path)
     session.server_url = server_url
     session.model_id = model_id
+    session.requested_model_id = args.model
+    session.model_request_recorded = True
     store.save(session)
+    selected_from = args.model or "automatic/report-inherited selection"
+    print(f"Model: {model_id} (requested: {selected_from}; provider: {server_url})")
 
     memory = None
     if args.memory_path:

@@ -254,6 +254,10 @@ class AnalysisResult:
     stats: dict = field(default_factory=dict)
     verification: dict = field(default_factory=dict)
     model_used: str | None = None
+    model_requested: str | None = None
+    provider_used: str | None = None
+    model_requested_by_tier: dict = field(default_factory=dict)
+    model_used_by_tier: dict = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     notices: list[str] = field(default_factory=list)
     """Recoveries worth REPORTING as good news (audit M2): a pass that failed,
@@ -1276,6 +1280,17 @@ def analyze(
     run_categories = resolve_categories(run_categories)
     result = AnalysisResult(doc=doc)
 
+    def capture_model_provenance():
+        result.model_requested = getattr(client, "model", None)
+        result.provider_used = getattr(client, "base_url", None)
+        result.model_requested_by_tier = {"primary": result.model_requested}
+        fast_model = getattr(client, "fast_model", None)
+        if fast_model:
+            result.model_requested_by_tier["fast"] = fast_model
+        result.model_used_by_tier = dict(getattr(client, "model_used_by_tier", {}) or {})
+
+    capture_model_provenance()
+
     def emit(stage, status, detail=""):
         if progress_cb:
             progress_cb({"stage": stage, "status": status, "detail": detail})
@@ -1356,7 +1371,9 @@ def analyze(
         result.model_used = client.resolve_model()
     except LlamaServerError as e:
         result.errors.append(f"Could not reach model server: {e}")
+        capture_model_provenance()
         return result
+    capture_model_provenance()
 
     # 1b. deterministic craft passes — voice-bleed & on-the-nose subtext.
     # No model call, never fail the pipeline, and they read the parsed text
@@ -1918,4 +1935,5 @@ def analyze(
     _cp()
 
     emit("done", "complete", "Analysis complete")
+    capture_model_provenance()
     return result

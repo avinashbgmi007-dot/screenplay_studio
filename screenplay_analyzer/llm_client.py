@@ -118,6 +118,12 @@ class LlamaServerClient(BaseLlamaClient):
         super().__init__(base_url, model=model, timeout=timeout, extra_headers=extra_headers,
                          fallback_to_loaded=fallback_to_loaded)
         self.fast_model = fast_model or None
+        self.model_used_by_tier: dict[str, str] = {}
+
+    def resolve_model(self) -> str:
+        model = super().resolve_model()
+        self.model_used_by_tier["primary"] = model
+        return model
 
     def list_models(self) -> list[dict]:
         return self.list_models_raw()
@@ -152,9 +158,12 @@ class LlamaServerClient(BaseLlamaClient):
         the call stops attempting. None disables the budget (old behavior).
         """
         if fast and self.fast_model:
+            tier = "fast"
             model = self.resolve_model_id(self.fast_model)
         else:
+            tier = "primary"
             model = self.resolve_model()
+        self.model_used_by_tier[tier] = model
         payload = {
             "model": model,
             "messages": [

@@ -128,7 +128,7 @@ class Orchestrator:
             from .revision import load_working
             doc = load_working(m)
             client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
-                                       fallback_to_loaded=True, fast_model=m.fast_model,
+                                       fallback_to_loaded=False, fast_model=m.fast_model,
                                        extra_headers=auth_headers(m.api_key))
 
             kwargs = {"report_language": language}
@@ -196,7 +196,9 @@ class Orchestrator:
             import time as _t
             atomic_write_json(m.progress_path, {"stage": "done", "status": "complete", "detail": "Analysis complete", "ts": _t.time()})
 
-            if result.model_used:
+            if result.model_used and not m.model_id:
+                # Discovery is durable when the writer did not pin a model.
+                # Never replace an explicit request with an unannounced alias.
                 m.model_id = result.model_used
 
             produced_anything = bool(result.findings) or result.coverage is not None
@@ -308,26 +310,30 @@ class Orchestrator:
             report_path = m.report_findings_path if m.stage("analyze").status == "complete" else None
 
             store = SessionStore(m.sessions_dir)
+            session = None
             if m.cowriter_session_id:
                 try:
                     session = store.load(m.cowriter_session_id)
                 except FileNotFoundError:
                     # The manifest's session was deleted (Clear chat does
-                    # DELETE then start) — recover by starting a fresh page
-                    # instead of bricking chat with a 502.
-                    session = store.create(title=m.title, report_path=report_path, script_path=m.parsed_path)
-                    m.cowriter_session_id = session.session_id
-            else:
-                session = store.create(title=m.title, report_path=report_path, script_path=m.parsed_path)
-                m.cowriter_session_id = session.session_id
+                    # DELETE then start) — create a fresh page only after model
+                    # resolution succeeds, so a stale pin leaves no phantom.
+                    session = None
 
-            client = LlamaServerClient(base_url=m.server_url, timeout=m.timeout, fallback_to_loaded=True,
+            client = LlamaServerClient(base_url=m.server_url, model=m.model_id,
+                                       timeout=m.timeout, fallback_to_loaded=False,
                                        extra_headers=auth_headers(m.api_key))
             report_ctx = ReportContext(load_json(report_path) if report_path else None)
             model_id = resolve_model(client, report_ctx, explicit_model=m.model_id)
 
+            if session is None:
+                session = store.create(title=m.title, report_path=report_path,
+                                       script_path=m.parsed_path)
+                m.cowriter_session_id = session.session_id
             session.server_url = m.server_url
             session.model_id = model_id
+            session.requested_model_id = m.model_id
+            session.model_request_recorded = True
             store.save(session)
 
             script_ctx = ScriptContext(load_json(m.parsed_path))

@@ -282,22 +282,21 @@ class TestChatFlow:
         assert data["session_id"]
         assert data["branch"] == "main"
 
-    def test_chat_falls_back_when_pinned_model_not_loaded(self, http_client):
-        """The project is pinned to a model the server no longer has loaded
-        (user swapped models) — the webapp must fall back to the loaded
-        model instead of failing the chat."""
+    def test_chat_refuses_to_substitute_an_unavailable_pinned_model(self, http_client):
+        """A pinned model that is no longer loaded must fail before creating a
+        chat session; the error identifies the unavailable selection."""
         webapp_server.CONFIG["model"] = "ghost-model.gguf"
         project = self._setup_analyzed_project(http_client)
         resp = http_client.post(f"/api/projects/{project}/chat/start")
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["model_id"] == "mock-e2e-model.gguf"
+        assert resp.status_code == 502
+        error = resp.get_json()["error"]
+        assert "ghost-model.gguf" in error
+        assert "mock-e2e-model.gguf" in error
 
-        sid = data["session_id"]
-        msg = http_client.post(f"/api/projects/{project}/chat/sessions/{sid}/messages",
-                               json={"text": "What about the revolver?"})
-        assert msg.status_code == 200
-        assert msg.get_json()["reply"]
+        manifest = webapp_server._load_manifest(project)
+        assert manifest.cowriter_session_id is None
+        from pathlib import Path
+        assert not list(Path(manifest.sessions_dir).glob("*.json"))
 
     def test_send_message_and_get_reply(self, http_client):
         project = self._setup_analyzed_project(http_client)

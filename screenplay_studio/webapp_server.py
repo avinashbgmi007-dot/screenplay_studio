@@ -5330,7 +5330,10 @@ def start_chat(name):
     except OrchestratorError as e:
         return _error(str(e), 502)
 
-    return jsonify({"session_id": session.session_id, "model_id": session.model_id, "branch": session.current_branch})
+    return jsonify({"session_id": session.session_id, "model_id": session.model_id,
+                    "requested_model_id": session.requested_model_id,
+                    "model_request_recorded": session.model_request_recorded,
+                    "server_url": session.server_url, "branch": session.current_branch})
 
 
 def _engine_base_url(session, manifest=None):
@@ -5390,7 +5393,7 @@ def _load_session_and_engine(project: str, session_id: str):
     # multi-minute hang. Analysis calls keep the long timeout; only chat
     # turns use turn_timeout.
     client = LlamaServerClient(base_url=_engine_base_url(session, m), model=session.model_id,
-                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True,
+                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=False,
                                extra_headers=_auth_headers(_api_key_for(m)))
     memory = None
     try:
@@ -5431,6 +5434,10 @@ def get_session(name, sid):
         "session_id": session.session_id,
         "title": session.title,
         "current_branch": session.current_branch,
+        "model_id": session.model_id,
+        "requested_model_id": session.requested_model_id,
+        "model_request_recorded": session.model_request_recorded,
+        "server_url": session.server_url,
         "last_seen_content": getattr(session, "last_seen_content", None),
         "branches": {
             bname: {
@@ -5642,10 +5649,13 @@ def refresh_writer_memory():
     # where `_load_session_and_engine` reads the session's own URL from too.
     client = llm_mod.LlamaServerClient(base_url=session.server_url or CONFIG["server_url"],
                                        model=session.model_id, timeout=CONFIG["timeout"],
-                                       fallback_to_loaded=True,
+                                       fallback_to_loaded=False,
                                        extra_headers=_auth_headers(CONFIG.get("api_key")))
     recent = [m.to_dict() for m in session.branch.messages[-16:]]
-    mem.refresh(client, recent, scope=engine.memory_scope, entities=engine._memory_entities())
+    try:
+        mem.refresh(client, recent, scope=engine.memory_scope, entities=engine._memory_entities())
+    except llm_mod.LlamaServerError as e:
+        return _error(f"Could not refresh writer memory with the session's selected model: {e}", 502)
     return jsonify({"profile": mem.to_dict(), "card": mem.card_text(scope=engine.memory_scope)})
 
 
@@ -5669,6 +5679,10 @@ def _idea_session_payload(session) -> dict:
         "session_id": session.session_id,
         "title": session.title,
         "current_branch": session.current_branch,
+        "model_id": session.model_id,
+        "requested_model_id": session.requested_model_id,
+        "model_request_recorded": session.model_request_recorded,
+        "server_url": session.server_url,
         "last_seen_content": getattr(session, "last_seen_content", None),
         "branches": {
             bname: {
@@ -5709,7 +5723,7 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
     report_ctx = ReportContext(None)
     # Idea chats run on the same short turn clock as script chats (watchdog).
     client = LlamaServerClient(base_url=_engine_base_url(session), model=session.model_id,
-                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True,
+                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=False,
                                extra_headers=_auth_headers(CONFIG.get("api_key")))
     # Isolation (writer-first rule): the idea chat knows ONLY this idea — the
     # free-form page + the conversation. The past-scripts library digest is
@@ -6327,12 +6341,12 @@ def start_idea_chat(idea_id):
     ReportContext = context_mod.ReportContext
     try:
         from screenplay_cowriter.discovery import resolve_model
-        client = LlamaServerClient(base_url=CONFIG["server_url"], timeout=CONFIG["timeout"],
-                                   fallback_to_loaded=True,
+        client = LlamaServerClient(base_url=CONFIG["server_url"], model=CONFIG["model"],
+                                   timeout=CONFIG["timeout"], fallback_to_loaded=False,
                                    extra_headers=_auth_headers(CONFIG.get("api_key")))
         model_id = resolve_model(client, ReportContext(None), explicit_model=CONFIG["model"])
-    except Exception:
-        model_id = CONFIG["model"]
+    except Exception as e:
+        return _error(f"Could not start idea chat with the selected model: {e}", 502)
     store = SessionStore(IdeaStore(_ideas_dir()).sessions_dir(idea_id))
     # RESUME, don't abandon: an idea's Sameer conversation is one continuing
     # relationship. A reload (or a return visit) picks up the most recent
@@ -6344,8 +6358,13 @@ def start_idea_chat(idea_id):
         session = store.create(title="Idea room")
     session.server_url = CONFIG["server_url"]
     session.model_id = model_id
+    session.requested_model_id = CONFIG["model"]
+    session.model_request_recorded = True
     store.save(session)
-    return jsonify({"session_id": session.session_id, "branch": session.current_branch})
+    return jsonify({"session_id": session.session_id, "model_id": session.model_id,
+                    "requested_model_id": session.requested_model_id,
+                    "model_request_recorded": session.model_request_recorded,
+                    "server_url": session.server_url, "branch": session.current_branch})
 
 
 @app.route("/api/ideas/<idea_id>/chat/sessions/<sid>", methods=["GET"])

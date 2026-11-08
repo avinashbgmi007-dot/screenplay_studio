@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from flask import Flask, request, jsonify
 
 from .store import SessionStore
+from .models import Session
 from .llm_client import LlamaServerClient, LlamaServerError
 from .context import ScriptContext, ReportContext, load_json
 from .discovery import resolve_model
@@ -86,6 +87,8 @@ def _session_summary(session):
         "current_branch": session.current_branch,
         "branches": {name: len(b.messages) for name, b in session.branches.items()},
         "model_id": session.model_id,
+        "requested_model_id": session.requested_model_id,
+        "model_request_recorded": session.model_request_recorded,
         "server_url": session.server_url,
     }
 
@@ -103,21 +106,26 @@ def list_sessions():
 @app.route("/sessions", methods=["POST"])
 def create_session():
     body = request.get_json()
-    session = store.create(
+    server_url = body.get("server_url", "http://localhost:8080")
+    requested_model_id = body.get("model")
+    draft = Session.new(
         title=body.get("title", "Untitled"),
         report_path=body.get("report_path"),
         script_path=body.get("script_path"),
     )
-    server_url = body.get("server_url", "http://localhost:8080")
-    client = LlamaServerClient(base_url=server_url, model=body.get("model"))
-    _, report_ctx = _load_contexts(session)
+    client = LlamaServerClient(base_url=server_url, model=requested_model_id)
+    _, report_ctx = _load_contexts(draft)
     try:
-        model_id = resolve_model(client, report_ctx, explicit_model=body.get("model"))
+        model_id = resolve_model(client, report_ctx, explicit_model=requested_model_id)
     except LlamaServerError as e:
         return jsonify({"error": str(e)}), 502
 
+    session = store.create(
+        title=draft.title, report_path=draft.report_path, script_path=draft.script_path)
     session.server_url = server_url
     session.model_id = model_id
+    session.requested_model_id = requested_model_id
+    session.model_request_recorded = True
     store.save(session)
     return jsonify(_session_summary(session)), 201
 
@@ -146,7 +154,8 @@ def send_message(session_id):
     except FileNotFoundError:
         return jsonify({"error": "not found"}), 404
 
-    client = LlamaServerClient(base_url=session.server_url, model=session.model_id, fallback_to_loaded=True)
+    client = LlamaServerClient(base_url=session.server_url, model=session.model_id,
+                               fallback_to_loaded=False)
     script_ctx, report_ctx = _load_contexts(session)
     memory = None
     if memory_path:

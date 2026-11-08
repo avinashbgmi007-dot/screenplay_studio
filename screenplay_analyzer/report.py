@@ -185,6 +185,10 @@ def render_markdown(result: AnalysisResult) -> str:
         lines.append(f"*by {doc.author}*")
     lines.append("")
     lines.append(f"**Parsed from:** `{doc.source_filename}` ({doc.source_format}, parse confidence: {doc.parse_confidence})")
+    if result.model_requested:
+        lines.append(f"**Requested model:** `{result.model_requested}`")
+    elif result.model_used:
+        lines.append("**Requested model:** *automatic selection*")
     if result.model_used:
         lines.append(f"**Analyzed with:** `{result.model_used}`")
     else:
@@ -194,6 +198,14 @@ def render_markdown(result: AnalysisResult) -> str:
         # banner says too, so the two artifacts agree.
         lines.append("**Analyzed with:** *not recorded* — this result does not say "
                      "which model produced it, so its provenance is unknown.")
+    if result.provider_used:
+        lines.append(f"**Model provider:** `{result.provider_used}`")
+    fast_requested = result.model_requested_by_tier.get("fast")
+    if fast_requested:
+        fast_used = result.model_used_by_tier.get("fast")
+        fast_line = f"**Fast-tier model:** requested `{fast_requested}`"
+        fast_line += f"; used `{fast_used}`" if fast_used else "; no successful call recorded"
+        lines.append(fast_line)
     if model_is_stand_in(result.model_used):
         # Its own line, above everything the writer is about to read, because
         # the whole report's standing changes: this is a demo of the machinery,
@@ -753,7 +765,11 @@ def to_findings_json(result: AnalysisResult) -> dict:
         },
         "title": result.doc.title,
         "source_filename": result.doc.source_filename,
+        "model_requested": result.model_requested,
         "model_used": result.model_used,
+        "provider_used": result.provider_used,
+        "model_requested_by_tier": result.model_requested_by_tier,
+        "model_used_by_tier": result.model_used_by_tier,
         "coverage": result.coverage,
         "character_reads": result.character_reads,
         "logline_test": result.logline_test,

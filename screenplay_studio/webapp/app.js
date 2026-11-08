@@ -1879,6 +1879,7 @@ async function saveIdeaStructure() {
 async function loadIdeaSession(sid) {
   const data = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/sessions/${sid}`);
   state.currentIdeaSession = data.session_id;
+  renderChatModelProvenance(data);
   state.branches = data.branches;
   state.currentBranch = data.current_branch;
   // Welcome-back recap: Sameer keeps a baseline of the page AS HE LAST READ
@@ -3407,9 +3408,43 @@ async function clearChat() {
   }
 }
 
+function renderChatModelProvenance(data = {}) {
+  const badge = $("#chat-model-provenance");
+  if (!badge) return;
+  const actual = data.model_id ? String(data.model_id) : "";
+  if (!actual) {
+    badge.hidden = true;
+    badge.textContent = "";
+    badge.removeAttribute("title");
+    return;
+  }
+  const shortName = (value) => {
+    const text = String(value || "");
+    const cut = Math.max(text.lastIndexOf(String.fromCharCode(92)), text.lastIndexOf("/"));
+    return cut >= 0 ? text.slice(cut + 1) : text;
+  };
+  const requested = data.requested_model_id ? String(data.requested_model_id) : "";
+  if (data.model_request_recorded === false) {
+    badge.textContent = "model: " + shortName(actual) + " · request not recorded";
+  } else if (requested && requested !== actual) {
+    badge.textContent = "requested " + shortName(requested) + " · using " + shortName(actual);
+  } else if (!requested) {
+    badge.textContent = "selected · " + shortName(actual);
+  } else {
+    badge.textContent = "model: " + shortName(actual);
+  }
+  const requestedTitle = data.model_request_recorded === false
+    ? "Requested model: not recorded in this older session."
+    : (requested ? "Requested model: " + requested + "." : "No model was explicitly requested.");
+  badge.title = requestedTitle + " Actual model: " + actual + ". Provider: "
+    + (data.server_url || "not recorded") + ".";
+  badge.hidden = false;
+}
+
 async function loadSession(sessionId) {
   const data = await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${sessionId}`);
   state.currentSession = data.session_id;
+  renderChatModelProvenance(data);
   state.branches = data.branches;
   state.currentBranch = data.current_branch;
   resetChatHistory();
@@ -7724,17 +7759,34 @@ function buildAmbiguousMarksNotice() {
 // liked. Each builder below returns null when the report has nothing to say, so a
 // report without the field renders exactly what it rendered before.
 function buildReportModelLine() {
-  const model = state.report && state.report.model_used;
+  const report = state.report || {};
+  const model = report.model_used;
   if (!model) return null;
   // The status strip names the model CONFIGURED NOW, which on a reopened project
   // may never have read this script. The basename is the half worth reading, and
   // a model id is a Windows path as often as it is a name.
-  const m = String(model);
-  const cut = Math.max(m.lastIndexOf(String.fromCharCode(92)), m.lastIndexOf("/"));
-  const line = el("p", "dock-report-model",
-    "\u2699 analysed by " + (cut >= 0 ? m.slice(cut + 1) : m));
-  line.title = "The model that wrote this report. The status strip shows the model"
-    + " configured right now, which is not always the same one.";
+  const label = (value) => {
+    const text = String(value || "");
+    const cut = Math.max(text.lastIndexOf(String.fromCharCode(92)), text.lastIndexOf("/"));
+    return cut >= 0 ? text.slice(cut + 1) : text;
+  };
+  let text = "\u2699 analysed by " + label(model);
+  if (Object.prototype.hasOwnProperty.call(report, "model_requested")) {
+    if (report.model_requested && report.model_requested !== model) {
+      text = "\u2699 requested " + label(report.model_requested) + " · analysed by " + label(model);
+    } else if (!report.model_requested) {
+      text = "\u2699 auto-selected · analysed by " + label(model);
+    }
+  }
+  const line = el("p", "dock-report-model", text);
+  const provider = report.provider_used ? " Provider: " + report.provider_used + "." : "";
+  const fastRequested = report.model_requested_by_tier && report.model_requested_by_tier.fast;
+  const fastUsed = report.model_used_by_tier && report.model_used_by_tier.fast;
+  const fast = fastRequested
+    ? " Fast tier requested: " + fastRequested + "; used: " + (fastUsed || "no successful call recorded") + "."
+    : "";
+  line.title = "Model identity recorded for this report; the status strip shows the model"
+    + " configured right now, which may be different." + provider + fast;
   return line;
 }
 

@@ -33,6 +33,10 @@ EXCLUDED_SECTIONS = frozenset({
     "withdrawals", "stats", "errors", "notices", "recoveries",
     "character_dials", "verification_summary", "logline_test",
     "model_used", "source_filename", "title",
+    # Gap 40: selection/provenance metadata (requested and actual IDs,
+    # provider endpoint and per-tier maps), not screenplay analysis text.
+    "model_requested", "provider_used", "model_requested_by_tier",
+    "model_used_by_tier",
     # Gap 47: per-pass outcome metadata ("ok" / "failed" / "skipped"). It says
     # whether a section was assessed, not what was found in it — searching it
     # for findings would match nothing, since the values are three fixed words.
