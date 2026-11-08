@@ -9,6 +9,8 @@ Each consumer subclasses BaseLlamaClient and adds its own chat method:
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit, urlunsplit
+
 import hashlib
 import random
 import re
@@ -47,6 +49,31 @@ class LlamaServerError(Exception):
 
 class ModelNotFoundError(LlamaServerError):
     pass
+
+
+def normalize_openai_base_url(base_url: str) -> str:
+    """Canonicalize an OpenAI-compatible API root for clients that append `/v1`.
+
+    The public configuration has historically accepted both an origin/path
+    prefix and the same URL ending in `/v1`. Keep the prefix but remove that
+    one exact terminal version segment so every endpoint builder gets exactly
+    one `/v1`. Do not treat substrings such as `/v1ish` as a version segment.
+    Query/fragment forms keep their legacy behavior; the endpoint clients do
+    not yet provide a separate URL builder for those components.
+    """
+    value = str(base_url or "").strip().rstrip("/")
+    # Query and fragment endpoint semantics are a separate compatibility
+    # contract. Preserve them byte-for-byte rather than rewriting a path while
+    # the current clients still concatenate endpoint paths as strings.
+    if "?" in value or "#" in value:
+        return value
+    parts = urlsplit(value)
+    path = parts.path.rstrip("/")
+    if path == "/v1":
+        path = ""
+    elif path.endswith("/v1"):
+        path = path[:-3]
+    return urlunsplit((parts.scheme, parts.netloc, path, "", "")).rstrip("/")
 
 
 def auth_headers(api_key: str | None) -> dict:
@@ -89,7 +116,7 @@ def busy_retry_delay(attempt: int, base: float = 1.5) -> float:
 class BaseLlamaClient:
     def __init__(self, base_url: str, model: str | None = None, timeout: int = 600,
                  extra_headers: dict | None = None, fallback_to_loaded: bool = False):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = normalize_openai_base_url(base_url)
         self.model = model
         self.timeout = timeout
         self.extra_headers = extra_headers or {}

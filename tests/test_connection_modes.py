@@ -273,6 +273,28 @@ class TestSwitchingBackToLocal:
 # ---------------------------------------------------------------------------
 
 class TestTokenReachesTheWire:
+    @pytest.mark.parametrize(
+        ("suffix", "expected_path"),
+        [
+            ("", "/v1/models"),
+            ("/v1", "/v1/models"),
+            ("/v1/", "/v1/models"),
+            ("/gateway", "/gateway/v1/models"),
+            ("/gateway/v1/", "/gateway/v1/models"),
+            ("/v1ish", "/v1ish/v1/models"),
+        ],
+    )
+    def test_test_connection_normalizes_only_a_final_v1_segment(
+        self, http_client, recording_server, suffix, expected_path
+    ):
+        base, recorder = recording_server
+        r = http_client.post("/api/test-connection",
+                             json={"server_url": f"{base}{suffix}", "api_key": TOKEN})
+        assert r.status_code == 200, r.get_data(as_text=True)
+        assert r.get_json()["ok"] is True
+        assert recorder.seen_paths[-1] == expected_path
+        assert recorder.seen_headers[-1].get("Authorization") == f"Bearer {TOKEN}"
+
     def test_test_connection_sends_the_bearer_header(self, http_client, recording_server):
         base, recorder = recording_server
         r = http_client.post("/api/test-connection",
