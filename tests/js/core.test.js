@@ -196,6 +196,18 @@ test("destinationMismatchText: silent when every project agrees with the mode", 
   assert.strictEqual(destinationMismatchText({ remote_projects: [] }), null);
 });
 
+test("destinationMismatchText: shows local projects on a different effective URL", () => {
+  const text = destinationMismatchText({
+    remote_projects: [],
+    mismatched_projects: [{
+      project: "older-local-project", mode: "local", server_url: "http://127.0.0.1:8123",
+    }],
+  });
+  assert.ok(text.includes("older-local-project"), text);
+  assert.ok(text.includes("http://127.0.0.1:8123"), text);
+  assert.ok(/Save again/.test(text), text);
+});
+
 test("destinationMismatchText: names the project still sending to a provider", () => {
   const text = destinationMismatchText({
     remote_projects: [{ project: "act-two", has_credential: true }],

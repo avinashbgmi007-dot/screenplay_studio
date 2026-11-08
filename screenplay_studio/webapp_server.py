@@ -1047,9 +1047,9 @@ def _project_destinations() -> list[dict]:
 def _destination_report() -> dict:
     """The global destination, plus every project that disagrees with it.
 
-    `remote_projects` is the field the settings panel needs: a non-empty list
-    means "you are in local mode but these projects still send turns to a
-    provider", which is exactly the state gap 58 said must never be silent.
+    `remote_projects` preserves the local-mode privacy warning; `mismatched_projects`
+    also names loopback projects on a different URL, which may be stale/dead even
+    though they remain local. Neither disagreement is hidden by the global setting.
     """
     global_mode = connection_mode()
     projects = _project_destinations()
@@ -1059,6 +1059,7 @@ def _destination_report() -> dict:
         "server_url": CONFIG.get("server_url"),
         "mode": global_mode,
         "remote_projects": [r for r in disagreeing if r["mode"] == "remote"],
+        "mismatched_projects": disagreeing,
         "project_count": len(projects),
         "projects_elsewhere": len(disagreeing),
     }
@@ -1721,25 +1722,25 @@ def _adopt_connection(m: ProjectManifest) -> ProjectManifest:
 # `_UNSET` is defined once, near the settings candidate that documents it.
 
 
-def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) -> None:
-    """Carry a settings change to every existing project manifest.
+def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) -> dict:
+    """Apply the requested settings to projects and report each effective result.
 
-    Projects snapshot server_url at creation time. Without this sync, a project
-    analyzed against an old server keeps pointing there forever — chat, rewrite
-    and analyze all hit the dead URL while the connection strip shows green
-    (it tests the global config, not the manifest). Called when settings save.
+    Manifest writes are atomic per project, not across the whole project set.
+    A failure must therefore be returned to the caller with the destination
+    still effective on disk; it is not safe to turn a partial sync into success.
+    Repeating the same settings save is the explicit reconciliation operation.
     """
-    # Checked here as well as in the setter: this is the call that makes a bad
-    # URL *sticky*, and it is reachable on its own.
     _validate_server_url(server_url)
+    result = {"ok": True, "updated": [], "unchanged": [], "failed": []}
     if not os.path.isdir(PROJECTS_DIR):
-        return
+        return result
     for name in os.listdir(PROJECTS_DIR):
-        manifest_path = os.path.join(PROJECTS_DIR, name, "project.json")
+        project_dir = os.path.join(PROJECTS_DIR, name)
+        manifest_path = os.path.join(project_dir, "project.json")
         if not os.path.isfile(manifest_path):
             continue
         try:
-            m = ProjectManifest.load(os.path.join(PROJECTS_DIR, name))
+            m = ProjectManifest.load(project_dir)
             changed = False
             if m.server_url != server_url:
                 m.server_url = server_url
@@ -1751,17 +1752,38 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) 
                     changed = True
             if api_key is not _UNSET:
                 # None here means "the token was cleared", and that must reach
-                # the projects too: gap 58's second half was a "go local" that
-                # reset the global key while every existing project kept the
-                # remote token, so the project's own client still used it.
+                # the projects too: the project's own client must not keep an
+                # old remote credential after the desk switches to local.
                 new_key = api_key or None
                 if m.api_key != new_key:
                     m.api_key = new_key
                     changed = True
             if changed:
                 m.save()
+                result["updated"].append({
+                    "project": name,
+                    "effective_server_url": m.server_url,
+                })
+            else:
+                result["unchanged"].append({
+                    "project": name,
+                    "effective_server_url": m.server_url,
+                })
         except Exception:
-            continue  # unreadable project dir — never let one bad manifest break the settings save
+            # Do not disclose local filesystem paths or exception details, but
+            # report the effective value after the failed write if it remains
+            # readable. Unknown means exactly that: we could not verify it.
+            try:
+                effective_url = ProjectManifest.load(project_dir).server_url
+            except Exception:
+                effective_url = None
+            result["failed"].append({
+                "project": name,
+                "effective_server_url": effective_url,
+                "error": "Could not update this project's settings.",
+            })
+    result["ok"] = not result["failed"]
+    return result
 
 
 try:  # the typed damage error is optional: the package may not be installed
@@ -2147,11 +2169,12 @@ def set_config():
     next analysis goes somewhere they were told was refused.
 
     Now `_settings_candidate` validates the entire request and returns a plan,
-    and nothing below is reached unless it succeeded. The propagation to
-    existing projects uses the same plan, so the global config and every
-    manifest cannot disagree about where the model lives — which is the other
-    half of this gap ("go local" resetting the desk while projects stayed
-    remote).
+    and nothing below is reached unless it succeeded. Existing project manifests
+    are then updated one at a time: each save is atomic, but the collection is not
+    a transaction. Any failed copy returns 409 with its verified effective URL
+    (or unknown), keeps the Settings form open for an explicit retry, and remains
+    visible in the destination report. In-flight requests keep the destination
+    they already loaded; later requests use the manifest that was atomically saved.
     """
     global _DEMO_MODEL_ACTIVE
     body = request.get_json() or {}
@@ -2180,15 +2203,12 @@ def set_config():
     if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
         _DEMO_MODEL_ACTIVE = False
 
+    project_sync = None
     if moved_url or plan["api_key"] is not _UNSET or plan["model"] is not _UNSET:
-        # the writer changed WHERE the model lives or HOW to reach it — carry
-        # that to every existing project too. Without this, projects keep a
-        # stale per-project server_url (e.g. an old port) and every LLM call
-        # (chat, rewrite, analyze) silently hits a dead server while the status
-        # strip shows green (it tests the global URL, not the manifest's).
-        # Passing the token through — including `None` for a clear — is what
-        # makes a local switch actually local for those projects.
-        _sync_server_url_to_projects(
+        # The global setting is applied first; manifests are atomic per-project,
+        # not as a multi-file transaction. Keep every outcome so a failed copy
+        # cannot be reported as a successful, fully propagated change.
+        project_sync = _sync_server_url_to_projects(
             CONFIG["server_url"],
             plan["model"] if plan["model"] is not _UNSET else _UNSET,
             api_key=(None if plan["clear_token"] else
@@ -2205,6 +2225,24 @@ def set_config():
     cfg["privacy"] = _privacy_statement()
     cfg["destinations"] = _destination_report()
     cfg["provider"] = connection_report()
+    if project_sync is not None:
+        cfg["project_sync"] = project_sync
+        if not project_sync["ok"]:
+            details = []
+            for failure in project_sync["failed"]:
+                effective = failure.get("effective_server_url")
+                destination = f"effective URL: {effective}" if effective else "effective URL unknown"
+                details.append(f"{failure['project']} ({destination})")
+            names = "; ".join(details)
+            return jsonify({
+                "error": "Desk settings were saved, but project settings were only "
+                         f"partly applied: {names}. Affected projects continue using "
+                         "their effective destinations above. Save these settings "
+                         "again to retry reconciliation.",
+                "settings_saved": True,
+                "project_sync": project_sync,
+                "destinations": cfg["destinations"],
+            }), 409
     return jsonify(cfg)
 
 

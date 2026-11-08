@@ -1,9 +1,12 @@
-"""Gap 58: a settings save is all-or-nothing, and "Local" means local everywhere.
+"""Settings validation is all-or-nothing; project sync is explicit and honest.
 
 Two defects, one seam. `POST /api/config` mutated as it parsed, so a request
 rejected at the eleventh field had already changed the first ten — and the one
 that landed was usually `server_url`, i.e. where the writer's script goes next.
-The writer was told the save failed and the desk had moved anyway.
+The writer was told the save failed and the desk had moved anyway. A later gap
+showed the other boundary: a valid global save could partially fail across
+project manifests and still return success. Writes are atomic per project, not
+across the set, so that result must be reported and retryable.
 
 The second half is the same seam seen from the other side. `connection_mode()`
 describes the GLOBAL setting, but every project carries its own `server_url` and
@@ -236,6 +239,48 @@ class TestAMismatchIsReported:
         body = client.post("/api/config", json={"connection_mode": "local"}).get_json()
         assert [r["project"] for r in body["destinations"]["remote_projects"]] == [made]
 
+    def test_partial_manifest_write_is_explicit_and_saving_again_reconciles(
+        self, client, monkeypatch
+    ):
+        made = _project(client)
+        project_dir = os.path.realpath(webapp_server._project_dir(made))
+        original_save = ProjectManifest.save
+
+        def fail_this_project(self):
+            if os.path.realpath(self.project_dir) == project_dir:
+                raise OSError("synthetic disk-full failure")
+            return original_save(self)
+
+        monkeypatch.setattr(ProjectManifest, "save", fail_this_project)
+        response = client.post("/api/config", json={"connection_mode": "local"})
+        assert response.status_code == 409
+        body = response.get_json()
+        assert body["settings_saved"] is True
+        assert made in body["error"]
+        assert REMOTE_API in body["error"]
+        assert "Save these settings again" in body["error"]
+        assert webapp_server.CONFIG["server_url"] == "http://localhost:8080"
+        assert body["project_sync"]["ok"] is False
+        assert body["project_sync"]["failed"] == [{
+            "project": made,
+            "effective_server_url": REMOTE_API,
+            "error": "Could not update this project's settings.",
+        }]
+        assert [r["project"] for r in body["destinations"]["remote_projects"]] == [made]
+        unchanged = ProjectManifest.load(webapp_server._project_dir(made))
+        assert unchanged.server_url == REMOTE_API
+        assert unchanged.api_key == TOKEN
+
+        # Retrying the same explicit settings save is the reconciliation path;
+        # the old destination is not silently adopted or forgotten.
+        monkeypatch.setattr(ProjectManifest, "save", original_save)
+        retry = client.post("/api/config", json={"connection_mode": "local"})
+        assert retry.status_code == 200
+        assert retry.get_json()["project_sync"]["ok"] is True
+        updated = ProjectManifest.load(webapp_server._project_dir(made))
+        assert updated.server_url == "http://localhost:8080"
+        assert updated.api_key is None
+
     def test_a_local_project_on_the_same_url_is_a_full_agreement(self, client):
         """A new project inherits the global URL, so it agrees on both counts.
 
@@ -259,6 +304,12 @@ class TestAMismatchIsReported:
         d = client.get("/api/config").get_json()["destinations"]
         assert d["projects_elsewhere"] == 1
         assert d["remote_projects"] == [], "a loopback project is not remote"
+        assert d["mismatched_projects"] == [{
+            "project": made,
+            "server_url": "http://127.0.0.1:8123",
+            "mode": "local",
+            "has_credential": False,
+        }]
 
     def test_the_projects_list_never_carries_the_token(self, client):
         _project(client)

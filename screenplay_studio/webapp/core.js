@@ -217,26 +217,45 @@ function verificationReadoutText(vs) {
  * produced the worst possible state: a green "Local" label over turns that were
  * still being sent to a provider.
  *
- * Server-side, `_sync_server_url_to_projects` now keeps them in step, so this
- * should normally return null. When it does not — a hand-edited manifest, a
- * project directory that could not be written — the writer must be told, named,
- * rather than shown a reassurance that is false. Pure, so the wording is tested
- * in node without a browser.
+ * Server-side, `_sync_server_url_to_projects` normally keeps them in step.
+ * Multi-manifest sync is not a transaction: when a project could not be written,
+ * the API reports a partial apply and this warning names the saved effective
+ * destination until the writer retries. Pure, so wording is tested in node.
  */
 function destinationMismatchText(destinations) {
   if (!destinations || typeof destinations !== "object") return null;
   const remote = Array.isArray(destinations.remote_projects)
     ? destinations.remote_projects : [];
-  if (!remote.length) return null;
+  const mismatched = Array.isArray(destinations.mismatched_projects)
+    ? destinations.mismatched_projects : remote;
+  const list = (projects) => {
+    const details = projects.map((r) => {
+      const name = (r && r.project) || "a project";
+      const url = r && r.server_url;
+      return url ? name + " (" + url + ")" : name;
+    });
+    return details.length <= 3
+      ? details.join(", ")
+      : details.slice(0, 3).join(", ") + " and " + (details.length - 3) + " more";
+  };
+  if (!remote.length) {
+    if (!mismatched.length) return null;
+    return "Projects using different effective server URLs: " + list(mismatched)
+      + ". Save again to retry reconciliation before assuming they use this desk's destination.";
+  }
   const names = remote.map((r) => (r && r.project) || "a project");
   const listed = names.length <= 3
     ? names.join(", ")
     : names.slice(0, 3).join(", ") + " and " + (names.length - 3) + " more";
-  return "Still sending to a provider: " + listed + " "
+  let text = "Still sending to a provider: " + listed + " "
     + (names.length === 1 ? "has its own" : "have their own")
     + " server URL and " + (remote.some((r) => r && r.has_credential)
       ? "an API token saved" : "no token")
     + ". Save again, or open the project, before assuming this desk is local.";
+  const local = mismatched.filter((r) => r && r.mode !== "remote"
+    && !remote.some((remoteRow) => remoteRow && remoteRow.project === r.project));
+  if (local.length) text += " Other projects use different local URLs: " + list(local) + ".";
+  return text;
 }
 
 /**

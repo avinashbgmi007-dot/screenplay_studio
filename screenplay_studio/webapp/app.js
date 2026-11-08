@@ -881,7 +881,15 @@ async function saveConfig() {
     applyDemoDisclosure();
     checkConnection();
   } catch (e) {
-    showError("Couldn't save settings: " + e.message);
+    // A per-project manifest can fail after global settings have been saved.
+    // Keep the modal open, refresh the truthful effective destinations, and
+    // leave Save available so the same settings can explicitly retry sync.
+    try {
+      state.config = await api("/config");
+      renderDestinationWarning(state.config);
+      renderProviderStatus(state.config);
+    } catch (_) { /* the server's partial-apply error remains actionable */ }
+    showError(e.message, true);
   }
 }
 
