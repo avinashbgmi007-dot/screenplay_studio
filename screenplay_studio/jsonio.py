@@ -546,7 +546,7 @@ def _fsync_dir(directory: str) -> None:
             pass
 
 
-def atomic_write_json(path: str, data) -> None:
+def atomic_write_json(path: str, data, mode: int = 0o666) -> None:
     """Serialize `data` as JSON to `path` atomically (unique tmp + fsync + replace).
 
     The temp file name must be UNIQUE per writer. It used to be a fixed
@@ -556,14 +556,16 @@ def atomic_write_json(path: str, data) -> None:
     unparseable reads, `edits.json` keeping 150 of 508 applied edits, and
     `finding_marks.json` left permanently torn at rest.
 
-    `0o666` (umask-applied, exactly what `open()` used to give) rather than
-    mkstemp's 0600, so adopting this does not quietly re-permission every store
-    on disk. The fd is fsynced before the rename: a crash must not leave a
-    directory entry pointing at bytes the filesystem has not committed.
+    `mode` defaults to `0o666` (umask-applied, exactly what `open()` used to
+    give), so adopting this does not quietly re-permission every store on disk.
+    Secret-bearing project manifests pass `0o600`, creating the replacement
+    privately rather than chmod-ing it after a readable window. The fd is fsynced
+    before the rename: a crash must not leave a directory entry pointing at bytes
+    the filesystem has not committed.
     """
     with _lock_for(path):
         tmp = f"{path}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
-        fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o666)
+        fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_EXCL, mode)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)

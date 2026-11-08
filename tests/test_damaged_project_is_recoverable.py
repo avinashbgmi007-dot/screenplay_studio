@@ -85,7 +85,8 @@ def test_the_recovery_archive_says_it_did_not_interpret_anything(desk):
     zf = zipfile.ZipFile(io.BytesIO(r.data))
     manifest = json.loads(zf.read("recovery-manifest.json"))
     assert manifest["kind"] == "recovery"
-    assert "without reading project.json" in manifest["note"]
+    assert "without requiring a readable project manifest" in manifest["note"]
+    assert "Known credentials are redacted" in manifest["note"]
     assert manifest["files"] >= 2
     assert manifest["complete"] is True
 

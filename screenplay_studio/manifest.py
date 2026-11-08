@@ -452,7 +452,12 @@ class ProjectManifest:
                 on_disk = load_json_store(self.manifest_path, None, assume_present=True)
                 if isinstance(on_disk, dict):
                     out = _merge_manifest(self._baseline, desired, on_disk)
-            atomic_write_json(self.manifest_path, out)
+            # The API key belongs at rest only in the writer's project file.
+            # On POSIX, create the replacement owner-only (not chmod after the
+            # write, which leaves a readable window). Other stores retain the
+            # historical umask-derived mode.
+            atomic_write_json(self.manifest_path, out,
+                              mode=0o600 if (out.get("api_key") or "").strip() else 0o666)
         # Whatever is now on disk is this object's reference point: a field we
         # did not own keeps the other writer's value without us "changing" it
         # back on the next save.
@@ -465,6 +470,9 @@ class ProjectManifest:
     def load(project_dir: str) -> "ProjectManifest":
         from .jsonio import StoreUnreadable, load_json_store
         path = os.path.join(project_dir, "project.json")
+        isjunction = getattr(os.path, "isjunction", None)
+        if os.path.islink(path) or (isjunction is not None and isjunction(path)):
+            raise StoreUnreadable(path, "project.json is a symlink or junction; refusing to follow it")
         if not os.path.exists(path):
             raise FileNotFoundError(f"No project found at '{project_dir}' (no project.json).")
         # The shared store reader, so a damaged manifest is DAMAGE (StoreUnreadable
@@ -489,6 +497,15 @@ class ProjectManifest:
         # 21 of 22 projects on disk store such a relative path, so this was the normal
         # case. `save()` then writes the resolved directory back, repairing the record.
         m.project_dir = project_dir
+        # Migrate older manifests that predate private file mode before the
+        # credential is used on this load. Windows relies on the containing
+        # user's ACL; POSIX gets an explicit owner-only file mode.
+        if os.name == "posix" and (m.api_key or "").strip():
+            try:
+                os.chmod(path, 0o600, follow_symlinks=False)
+            except OSError as e:
+                raise StoreUnreadable(
+                    path, f"could not restrict permissions on credential-bearing project.json: {e}") from e
         return m
 
     @staticmethod

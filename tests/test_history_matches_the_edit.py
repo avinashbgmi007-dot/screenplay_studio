@@ -57,12 +57,12 @@ def _fail_log_writes(m, monkeypatch, times: int = 1, exc=OSError):
     real = jsonio.atomic_write_json
     state = {"left": times}
 
-    def flaky(path, data):
+    def flaky(path, data, **kwargs):
         if os.path.abspath(str(path)) == os.path.abspath(revision.edits_log_path(m)) \
                 and state["left"] > 0:
             state["left"] -= 1
             raise exc("injected: the edit log could not be written")
-        return real(path, data)
+        return real(path, data, **kwargs)
 
     monkeypatch.setattr(jsonio, "atomic_write_json", flaky)
     return state

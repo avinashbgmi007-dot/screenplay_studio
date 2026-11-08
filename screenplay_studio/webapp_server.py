@@ -24,6 +24,7 @@ import re
 import sys
 import threading
 import shutil
+import stat
 import time
 import uuid
 import traceback
@@ -1297,7 +1298,9 @@ def _manifest_damage(project_dir: str) -> str | None:
     "repaired" into existence by a recovery route.
     """
     path = os.path.join(project_dir, "project.json")
-    if not os.path.exists(path):
+    if _is_archive_symlink(path):
+        return "project.json is a symlink or reparse point; not read"
+    if not os.path.lexists(path):
         return None
     try:
         ProjectManifest.load(project_dir)
@@ -1317,9 +1320,60 @@ def _recovery_project_dir(name: str) -> str:
     this is the only gate between an untrusted name and the filesystem.
     """
     project_dir = _project_dir(name)
-    if not os.path.isdir(project_dir):
+    root = os.path.realpath(PROJECTS_DIR)
+    if _is_archive_symlink(project_dir):
+        raise ValueError("Project directory is a symlink or reparse point; refusing to archive outside the library.")
+    resolved = os.path.realpath(project_dir)
+    if resolved != root and not resolved.startswith(root + os.sep):
+        raise ValueError("Project directory resolves outside the library; refusing recovery access.")
+    if not os.path.isdir(resolved):
         raise FileNotFoundError(f"No project directory at '{name}'.")
-    return project_dir
+    return resolved
+
+
+def _is_archive_symlink(path: str) -> bool:
+    """Treat POSIX symlinks and Windows reparse points/junctions alike."""
+    if os.path.islink(path):
+        return True
+    isjunction = getattr(os.path, "isjunction", None)
+    if isjunction is not None:
+        try:
+            if isjunction(path):
+                return True
+        except OSError:
+            return True
+    if os.name == "nt":
+        try:
+            attrs = getattr(os.stat(path, follow_symlinks=False), "st_file_attributes", 0)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+        return bool(attrs & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+    return False
+
+
+def _archive_walk(project_dir: str, prefix: str = ""):
+    """Yield archive files without descending into symlink directories."""
+    for root, dirnames, filenames in os.walk(project_dir, followlinks=False):
+        dirnames.sort()
+        for dirname in list(dirnames):
+            full = os.path.join(root, dirname)
+            if _is_archive_symlink(full):
+                dirnames.remove(dirname)
+                rel = os.path.relpath(full, project_dir).replace(os.sep, "/")
+                arc = f"{prefix}/{rel}" if prefix else rel
+                yield full, arc, "directory-symlink"
+        for filename in sorted(filenames):
+            full = os.path.join(root, filename)
+            rel = os.path.relpath(full, project_dir).replace(os.sep, "/")
+            arc = f"{prefix}/{rel}" if prefix else rel
+            yield full, arc, None
+
+
+def _record_archive_symlink(skipped: list, arcname: str, kind: str) -> None:
+    skipped.append({"path": arcname,
+                    "reason": f"{kind} symlink refused; target was not followed or read"})
 
 
 def _recovered_source_file(project_dir: str) -> str | None:
@@ -1360,16 +1414,19 @@ def recover_project(name):
         project_dir = _recovery_project_dir(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    except ValueError as e:
+        return _error(str(e), 400)
 
     path = os.path.join(project_dir, "project.json")
     raw, readable = None, False
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            raw = f.read()
-    except FileNotFoundError:
-        pass
-    except OSError as e:
-        return _error(f"project.json could not be read: {e}", 500)
+    if not _is_archive_symlink(path):
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                raw = f.read()
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            return _error(f"project.json could not be read: {e}", 500)
 
     try:
         ProjectManifest.load(project_dir)
@@ -1419,28 +1476,33 @@ def recover_backup(name):
         project_dir = _recovery_project_dir(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    except ValueError as e:
+        return _error(str(e), 400)
 
     buf = io.BytesIO()
-    skipped, kept = [], []
+    skipped, kept, withheld = [], [], []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Report what is in the folder and what actually left it; a recovery
-        # archive that quietly omits a file would be the same lie as gap 72.
-        for dirpath, _dirnames, filenames in os.walk(project_dir):
-            for fn in sorted(filenames):
-                full = os.path.join(dirpath, fn)
-                arc = os.path.relpath(full, project_dir).replace(os.sep, "/")
-                if fn.endswith((".lock", ".tmp")):
-                    continue
-                _add_file(zf, full, arc, skipped, kept)
+        # Copy recoverable evidence, but use the same explicit secret/symlink
+        # policy as healthy backups. An unreadable manifest is preserved only
+        # when its known credential field can be ruled out or safely redacted.
+        for full, arc, kind in _archive_walk(project_dir):
+            if kind:
+                _record_archive_symlink(skipped, arc, kind)
+                continue
+            if os.path.basename(full).endswith((".lock", ".tmp")):
+                continue
+            _add_file_redacted(zf, full, arc, skipped, kept, withheld)
         zf.writestr("recovery-manifest.json", json.dumps({
             "kind": "recovery",
             "generated": time.time(),
             "project": name,
-            "note": ("Copied without reading project.json. Nothing here was "
-                     "parsed, repaired or interpreted."),
+            "note": ("Copied without requiring a readable project manifest. "
+                     "Known credentials are redacted; unreadable manifests and "
+                     "symlinks are recorded if withheld."),
             "damage": _manifest_damage(project_dir),
             "files": len(kept),
             "skipped": skipped,
+            "credentials_withheld": withheld,
             "complete": not skipped,
         }, indent=2), zipfile.ZIP_DEFLATED)
 
@@ -1448,6 +1510,7 @@ def recover_backup(name):
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"{safe_dir_name(name)}-recovery.zip")
     _mark_completeness(resp, skipped, None)
+    _mark_credentials(resp, withheld)
     resp.headers["X-Recovery-Archive"] = "true"
     return resp
 
@@ -1464,6 +1527,8 @@ def repair_project(name):
         project_dir = _recovery_project_dir(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    except ValueError as e:
+        return _error(str(e), 400)
 
     path = os.path.join(project_dir, "project.json")
     if os.path.exists(path) and _manifest_damage(project_dir) is None:
@@ -2836,58 +2901,103 @@ _SECRET_MANIFEST_KEYS = ("api_key",)
 _REDACTABLE_SUFFIXES = ("project.json",)
 
 
-def _redacted_manifest_bytes(full: str) -> tuple[bytes | None, list[str]]:
-    """The file's bytes with every secret field cleared, plus what was cleared.
+def _regular_fd_for_path(fd: int, full: str) -> os.stat_result:
+    """Reject symlinks, non-regular files and final-component swap races."""
+    opened = os.fstat(fd)
+    try:
+        named = os.stat(full, follow_symlinks=False)
+    except OSError as e:
+        raise OSError("file path changed or became unreadable during archive") from e
+    if _is_archive_symlink(full):
+        raise OSError("symbolic link or reparse point refused; target was not read")
+    if not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode):
+        raise OSError("non-regular file refused")
+    if (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino):
+        raise OSError("file path changed during archive; refusing an unverified target")
+    return opened
 
-    Returns (None, []) when this file is not a manifest, so the caller knows to
-    add it unchanged.
 
-    Gap 8. The token lives in `project.json` on purpose (gap 58's
-    `_adopt_connection` copies it into every project so `resume` and the CLI work
-    without the writer retyping it). That is right for a file at rest on the
-    writer's own disk and wrong for an archive whose entire purpose is to leave
-    that disk — a backup gets emailed, dropped in a shared folder, put on a
-    stick.
+def _read_regular_file_nofollow(full: str) -> bytes:
+    """Read one regular file without following a final-component symlink."""
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if _is_archive_symlink(full):
+        raise OSError("symbolic link refused; target was not read")
+    fd = os.open(full, flags)
+    try:
+        _regular_fd_for_path(fd, full)
+        with os.fdopen(fd, "rb") as f:
+            fd = -1
+            return f.read()
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
-    Deliberately NOT a text scrub. Matching a token's shape across arbitrary
-    content would either miss a key it did not recognise or corrupt a script
-    that happened to contain the same characters. The manifest's structure names
-    its own secret, so this clears that field and leaves every other byte of the
-    document intact — which is what keeps the restore whole.
+
+def _redacted_manifest_bytes(full: str) -> tuple[bytes | None, list[str], bool]:
+    """Return (safe bytes, cleared field names, unsafe-to-include).
+
+    Valid manifests redact the known secret by field name. Damaged evidence is
+    preserved byte-for-byte when no key marker exists; a complete key literal is
+    redacted in place; an unisolatable key is withheld and named.
     """
     if os.path.basename(full) not in _REDACTABLE_SUFFIXES:
-        return None, []
+        return None, [], False
     try:
-        with open(full, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        # Unreadable or unparseable: hand it to _add_file untouched rather than
-        # silently substituting something. A damaged manifest is gap 80's
-        # territory, not this one.
-        return None, []
+        raw = _read_regular_file_nofollow(full)
+    except OSError:
+        return None, [], True
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        pattern = re.compile(rb'("api_key"\s*:\s*)"(?:\\.|[^"\\])*"')
+        scrubbed, count = pattern.subn(rb"\1null", raw)
+        if count:
+            return scrubbed, ["api_key"], False
+        if re.search(rb'"api_key"\s*:', raw):
+            return None, ["unknown"], True
+        return raw, [], False
     if not isinstance(data, dict):
-        return None, []
+        if re.search(rb'"api_key"\s*:', raw):
+            pattern = re.compile(rb'("api_key"\s*:\s*)"(?:\\.|[^"\\])*"')
+            scrubbed, count = pattern.subn(rb"\1null", raw)
+            if count:
+                return scrubbed, ["api_key"], False
+            return None, ["unknown"], True
+        return raw, [], False
 
     cleared = [key for key in _SECRET_MANIFEST_KEYS
                if data.get(key) not in (None, "")]
     if not cleared:
-        return None, []
+        return raw, [], False
     for key in cleared:
         data[key] = None
-    return json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8"), cleared
+    return json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8"), cleared, False
 
 
 def _add_file_redacted(zf, full: str, arcname: str, skipped: list, kept: list,
                        withheld: list) -> None:
-    """`_add_file`, but a manifest loses its secret fields on the way in."""
-    payload, cleared = _redacted_manifest_bytes(full)
+    """Add a file without following symlinks; redact or disclose manifest keys."""
+    if _is_archive_symlink(full):
+        _record_archive_symlink(skipped, arcname, "file")
+        if os.path.basename(full) in _REDACTABLE_SUFFIXES:
+            withheld.append({"path": arcname, "cleared": ["unknown"],
+                             "why": "manifest is a symlink; credential status was not determined"})
+        return
+    payload, cleared, unsafe = _redacted_manifest_bytes(full)
+    if unsafe:
+        skipped.append({"path": arcname,
+                        "reason": "manifest unreadable; withheld because credential status could not be determined"})
+        withheld.append({"path": arcname, "cleared": cleared or ["unknown"],
+                         "why": "credential status could not be determined safely"})
+        return
     if payload is None:
         _add_file(zf, full, arcname, skipped, kept)
         return
     zf.writestr(arcname, payload, zipfile.ZIP_DEFLATED)
     kept.append(arcname)
-    withheld.append({"path": arcname, "cleared": cleared,
-                     "why": "a credential must not travel in an archive"})
+    if cleared:
+        withheld.append({"path": arcname, "cleared": cleared,
+                         "why": "a credential must not travel in an archive"})
 
 
 def _mark_credentials(resp, withheld: list) -> None:
@@ -2903,25 +3013,42 @@ def _mark_credentials(resp, withheld: list) -> None:
 
 
 def _add_file(zf, full: str, arcname: str, skipped: list, kept: list) -> None:
-    """Add one file to the archive, recording whether it made it (gap 72).
-
-    Both backup routes used to wrap `zf.write` in `except OSError: continue`.
-    A file that vanished mid-zip — or one the OS refused to read — was dropped
-    from the archive and the writer was told nothing: a 200, a download that
-    looks complete, and a hole in it. Measured: with one file faulted, the
-    project archive came back **200** with that file absent, **no manifest inside
-    it** and no header to say so.
-
-    A backup is a promise about completeness, so an omission has to be on the
-    record. This records both sides; the caller puts them in the archive and in
-    the response.
-    """
+    """Add a regular file; symlinks and unreadable members are explicit skips."""
+    if _is_archive_symlink(full):
+        _record_archive_symlink(skipped, arcname, "file")
+        return
     try:
-        zf.write(full, arcname)
+        _zip_regular_file(zf, full, arcname)
     except OSError as e:
         skipped.append({"path": arcname, "reason": f"{type(e).__name__}: {e}"})
         return
     kept.append(arcname)
+
+
+def _zip_regular_file(zf, full: str, arcname: str) -> None:
+    """Copy from a no-follow regular-file descriptor into a ZIP member."""
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if _is_archive_symlink(full):
+        raise OSError("symbolic link or reparse point refused; target was not read")
+    fd = os.open(full, flags)
+    try:
+        info_stat = _regular_fd_for_path(fd, full)
+        modified = time.localtime(info_stat.st_mtime)
+        zip_time = (min(2107, max(1980, modified.tm_year)), modified.tm_mon,
+                    modified.tm_mday, modified.tm_hour, modified.tm_min, modified.tm_sec)
+        info = zipfile.ZipInfo(arcname, zip_time)
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.file_size = info_stat.st_size
+        if os.name == "posix":
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | stat.S_IMODE(info_stat.st_mode)) << 16
+        with os.fdopen(fd, "rb") as source:
+            fd = -1
+            with zf.open(info, "w") as dest:
+                shutil.copyfileobj(source, dest, 1024 * 1024)
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 @app.route("/api/projects/<name>/backup", methods=["GET"])
@@ -2929,6 +3056,12 @@ def backup_project(name):
     """Whole-project backup as a single .zip — source, parse, knowledge graph,
     report, sessions, edits, notes, stash. The writer's archive of their own
     desk, one click, nothing leaves the machine."""
+    try:
+        project_dir = _recovery_project_dir(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except ValueError as e:
+        return _error(str(e), 400)
     try:
         m = _load_manifest(name)
     except FileNotFoundError:
@@ -2938,21 +3071,18 @@ def backup_project(name):
         # one a damaged manifest locks. Fall through to the no-manifest archive.
         return recover_backup(name)
 
-    project_dir = os.path.realpath(m.project_dir)
     buf = io.BytesIO()
     skipped: list[dict] = []
     kept: list[str] = []
     withheld: list[dict] = []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(project_dir):
-            for fname in files:
-                # jsonio's lock sidecars, and any temp file a write is mid-flight
-                # through, are our plumbing rather than the writer's desk.
-                if fname.endswith(".lock") or fname.endswith(".tmp"):
-                    continue
-                full = os.path.join(root, fname)
-                arcname = os.path.join(name, os.path.relpath(full, project_dir))
-                _add_file_redacted(zf, full, arcname, skipped, kept, withheld)
+        for full, arcname, kind in _archive_walk(project_dir, name):
+            if kind:
+                _record_archive_symlink(skipped, arcname, kind)
+                continue
+            if os.path.basename(full).endswith((".lock", ".tmp")):
+                continue
+            _add_file_redacted(zf, full, arcname, skipped, kept, withheld)
         # Gap 72: the archive carries its own account of itself, so the record
         # travels with the file rather than only in a response header the
         # browser throws away.
@@ -3011,21 +3141,33 @@ def backup_library():
             for name in sorted(os.listdir(PROJECTS_DIR)):
                 # Same exclusions as the shelf listing: the profile store is
                 # internal data, not a project; a lock sidecar is a file.
-                if name == "writer_profile.json" or not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
+                if name == "writer_profile.json":
                     continue
-                project_dir = os.path.realpath(_project_dir(name))
+                candidate = os.path.join(PROJECTS_DIR, name)
+                if _is_archive_symlink(candidate):
+                    failed.append({"project": name,
+                                   "error": "project directory is a symlink; refusing to follow it"})
+                    continue
+                if not os.path.isdir(candidate):
+                    continue
+                project_dir = os.path.realpath(candidate)
+                projects_root = os.path.realpath(PROJECTS_DIR)
+                if project_dir != projects_root and not project_dir.startswith(projects_root + os.sep):
+                    failed.append({"project": name,
+                                   "error": "project directory resolves outside the library"})
+                    continue
                 try:
                     n_files = 0
-                    for root, _dirs, files in os.walk(project_dir):
-                        for fname in files:
-                            if fname.endswith(".lock") or fname.endswith(".tmp"):
-                                continue
-                            full = os.path.join(root, fname)
-                            arc = os.path.join(name, os.path.relpath(full, project_dir))
-                            before = len(skipped)
-                            _add_file_redacted(zf, full, arc, skipped, kept, withheld)
-                            if len(skipped) == before:
-                                n_files += 1
+                    for full, arc, kind in _archive_walk(project_dir, name):
+                        if kind:
+                            _record_archive_symlink(skipped, arc, kind)
+                            continue
+                        if os.path.basename(full).endswith((".lock", ".tmp")):
+                            continue
+                        before = len(skipped)
+                        _add_file_redacted(zf, full, arc, skipped, kept, withheld)
+                        if len(skipped) == before:
+                            n_files += 1
                     included.append({"project": name, "files": n_files})
                 except OSError as e:
                     # One unreadable project must not destroy the backup of

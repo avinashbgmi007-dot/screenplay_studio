@@ -39,18 +39,18 @@ def desk(monkeypatch, tmp_path):
 @pytest.fixture
 def flaky():
     """Fail the zip write for one named file, then restore it."""
-    real = zipfile.ZipFile.write
+    real = ws._zip_regular_file
     state = {"victim": None}
 
-    def _write(self, filename, arcname=None, **kw):
+    def _write(zf, filename, arcname):
         victim = state["victim"]
         if victim and str(filename).endswith(victim):
             raise OSError(2, "No such file or directory")
-        return real(self, filename, arcname, **kw)
+        return real(zf, filename, arcname)
 
-    zipfile.ZipFile.write = _write
+    ws._zip_regular_file = _write
     yield state
-    zipfile.ZipFile.write = real
+    ws._zip_regular_file = real
 
 
 # ---------- the filed reproduction ----------

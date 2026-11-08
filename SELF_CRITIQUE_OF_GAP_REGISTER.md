@@ -4069,3 +4069,68 @@ real corporate proxy was tested, because neither is permitted by this policy.
 
 Reverts: restoring follow behavior (10 failures) / restoring ambient proxy
 routing (1 failure).
+
+## §96 — Gap 34: protect the key without making the backup lie (2026-11-02)
+
+Reverts: 1 / 1 / 1 / 5 / 1 (save mode / legacy migration / recovery redaction / symlink membership / root containment).
+
+**Reverts:** each independent reversal caused its expected regression: restoring
+ordinary mode on credential saves **1 failed**; disabling legacy permission
+migration **1 failed**; bypassing recovery redaction **1 failed**; restoring
+symlink-following archive behavior **5 failed**; and removing project-root
+containment **1 failed**. These are the 11 tests in
+`tests/test_gap34_secure_archive_boundaries.py`.
+
+**The filing was partly stale.** Gap 8 had already redacted `api_key` from the
+project and library archives and recorded the withholding. Rewriting that would
+have duplicated a solved path. The real archive hole was the **recovery** backup,
+which used `_add_file` instead of `_add_file_redacted`; it copied a valid
+`project.json` credential unaltered. The other still-live issues were ordinary
+umask permissions for a secret-bearing manifest and `ZipFile.write` following
+file symlinks.
+
+**Fixes now share a policy:**
+
+- `atomic_write_json` accepts a mode while preserving the old default for every
+  ordinary store. A manifest with an API key is atomically created at `0600` on
+  POSIX; `ProjectManifest.load` migrates old readable credential manifests to
+  `0600` before returning the key. On Windows, the process relies on the parent
+  directory's per-user ACL; no custom Windows ACL writer or OS keychain was
+  added.
+- Every archive (project, library and recovery) uses the same redaction and
+  member policy. A parseable manifest is copied with its known key set to null.
+  A damaged manifest with a syntactically complete key value is redacted in its
+  original bytes; one with a key marker that cannot safely be isolated is
+  withheld and named as an incomplete archive. Damaged manifests with no key
+  marker remain byte-identical, preserving the recovery evidence contract.
+- File members are copied from an opened regular-file descriptor, with
+  `O_NOFOLLOW` where available; symlink/reparse-point files are skipped. The
+  opened and named file identities are rechecked before any content is read,
+  including platforms without `O_NOFOLLOW`. Archive walking prunes symlink
+  directories and records them. Project roots resolving outside the library are
+  refused (or recorded as failed in a library archive).
+  Every omission appears in the embedded manifest and completeness header.
+
+**The self-review trap:** the obvious `if islink(): skip` followed by
+`ZipFile.write(path)` still has a check/open race and lets `ZipFile.write` follow
+what it reopens. The implementation instead opens with `O_NOFOLLOW` where the
+platform supports it, checks `fstat` for a regular file, and copies that handle
+into `ZipFile.open`. The gap-72 fault injector had to move from monkeypatching
+`ZipFile.write` to the explicit archive-copy seam; it still proves a vanished
+file is named rather than silently dropped.
+
+**Limits kept visible:** the test reproduced POSIX `0644` under umask `022` and
+now proves `0600` plus migration. This does not claim a portable secure store:
+Windows ACLs are inherited, not rewritten, and no OS keychain migration was
+attempted. Existing exported archives remain outside the app's control. The
+recovery JSON endpoint still exposes raw manifest bytes to the local caller by
+design; only downloaded archives apply redaction.
+
+**Validation:** `tools/gap_harness/close_gap.py check 34` passed all checks:
+48 gap-owned tests, **3150 passed / 8 skipped / 2 warnings** in the full Python
+suite, and Ruff clean. The revert runs changed only the targeted policy at a
+time and restored the working implementation after each run. The five
+archive-member failures were
+project, library and recovery file links; a directory link; and a symlinked
+project manifest;
+the separate root-symlink case failed under the root-containment revert.
