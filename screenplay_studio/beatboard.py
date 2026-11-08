@@ -45,15 +45,99 @@ def scene_numbers(m) -> list[int]:
     return [s.scene_number for s in doc.scenes]
 
 
-def get_order(m) -> list[int]:
-    saved = _load(m).get("order")
-    natural = scene_numbers(m)
+def _scene_map(m) -> dict:
+    """{scene_number: heading} for the working copy — the IDENTITY of a card.
+
+    Gap 20: the board used to store a bare permutation of scene NUMBERS, so it
+    could only ask "is this still a valid permutation?" — never "are these still
+    the same scenes?". A re-parse that keeps the count but changes what scene 3
+    IS made a saved order silently apply to different scenes, and the board still
+    reported itself as current.
+    """
+    from .revision import load_working
+    doc = load_working(m)
+    return {s.scene_number: (s.heading_raw or "") for s in doc.scenes}
+
+
+def _stored_headings(data: dict) -> dict:
+    """The heading map the board was saved with, keys as ints.
+
+    JSON object keys are strings, so a board written by `set_order` stores
+    "3": "INT. KITCHEN - DAY". A board saved before gap 20 has no map at all.
+    """
+    raw = data.get("headings") or {}
+    out = {}
+    for k, v in raw.items():
+        try:
+            out[int(k)] = v
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def board_state(m) -> dict:
+    """The board, and the truth about how well it still fits the script.
+
+    Returns {order, saved, stale, saved_order, changed, reason, verified_by}.
+
+    - `order` is what the corkboard should render. When the board is stale it is
+      the NATURAL order, because drawing a saved arrangement over scenes that
+      no longer exist would be showing the writer something untrue.
+    - `saved` is only "a board exists" — the fact `has_board` reports, kept so
+      the two can never contradict each other silently.
+    - `stale` is the disclosure this entry is about. `has_board` returning True
+      used to be the ONLY thing the desk was told, so a stale board looked
+      exactly like a current one.
+    - `saved_order` and `changed` are preserved so the writer can RECONCILE
+      against their real arrangement instead of being handed the natural order
+      with no explanation. Nothing on disk is rewritten here: a failed match is a
+      question for the writer, never a reason to overwrite their work.
+    - `verified_by` says what the match could be checked against:
+      "scenes" (headings, gap 20) or "numbers_only" (a board saved before
+      headings were recorded — the permutation check is all that can be done,
+      and pretending otherwise would either invent staleness or hide it).
+    """
+    data = _load(m)
+    saved = data.get("order")
+    current = _scene_map(m)
+    natural = list(current)
     if not saved:
-        return natural
-    # guard against a stale board (e.g. a re-parse changed scene numbers)
+        return {"order": natural, "saved": False, "stale": False,
+                "saved_order": None, "changed": [], "reason": "",
+                "verified_by": None}
+    base = {"saved": True, "saved_order": list(saved)}
     if sorted(saved) != sorted(natural):
-        return natural
-    return saved
+        missing = [n for n in saved if n not in current]
+        added = [n for n in natural if n not in saved]
+        reason = ("the script's scenes changed since this board was saved"
+                  + (f" (scene {missing[0]} is gone)" if missing else "")
+                  + (f" ({len(added)} new scene(s) appeared)" if added else ""))
+        return {**base, "order": natural, "stale": True,
+                "changed": sorted(set(missing) | set(added)),
+                "reason": reason, "verified_by": "numbers_only"}
+    headings = _stored_headings(data)
+    if not headings:
+        # Legacy board: the permutation holds, and that is genuinely all that can
+        # be verified. Reported as numbers_only rather than as a pass.
+        return {**base, "order": list(saved), "stale": False,
+                "changed": [], "reason": "", "verified_by": "numbers_only"}
+    changed = [n for n in saved
+               if n in current and headings.get(n) not in (None, current[n])]
+    if changed:
+        return {**base, "order": natural, "stale": True, "changed": sorted(changed),
+                "reason": (f"scene {changed[0]} is a different scene now than when "
+                           "this board was saved (the numbering survived the "
+                           "re-parse, the scenes did not)"),
+                "verified_by": "scenes"}
+    return {**base, "order": list(saved), "stale": False, "changed": [],
+            "reason": "", "verified_by": "scenes"}
+
+
+def get_order(m) -> list[int]:
+    """The order to DRAW. Delegates to `board_state`, so a stale board yields the
+    natural order — and the caller that needs to know that is `board_view`, which
+    reports `stale` instead of leaving the fallback unobservable."""
+    return board_state(m)["order"]
 
 
 def set_order(m, order) -> dict:
@@ -70,7 +154,11 @@ def set_order(m, order) -> dict:
             f"order must be a permutation of the script's scene numbers "
             f"({len(natural)} scenes: {natural[:12]}{'…' if len(natural) > 12 else ''})."
         )
-    board = {"order": order, "saved_at": time.time()}
+    # Gap 20: store what each card WAS, not just where it sat. Without this the
+    # next read can only re-check the permutation, which is how a same-number /
+    # different-scene change slipped through looking current.
+    board = {"order": order, "saved_at": time.time(),
+             "headings": {str(n): _scene_map(m).get(n, "") for n in order}}
     _save(m, board)
     return board
 
@@ -99,8 +187,15 @@ def export_reordered(m, fmt: str = "fountain") -> str:
     from screenplay_parser.export import export
 
     doc = load_working(m)
-    order = get_order(m)
+    state = board_state(m)
+    order = state["order"]
     by_num = {s.scene_number: s for s in doc.scenes}
+    if state["stale"]:
+        # Refusing is the point: exporting the natural order under the label
+        # "your board" would hand the writer a script they did not arrange.
+        raise ValueError(
+            f"Beat-board order no longer matches the script — {state['reason']}. "
+            "Re-save the board to export it.")
     if len(order) != len(doc.scenes) or any(n not in by_num for n in order):
         raise ValueError("Beat-board order no longer matches the script — re-save the board.")
 
@@ -157,9 +252,19 @@ def board_view(m) -> dict:
             "word_count": est.get("words", 0),
             "your_notes": len(notes_for_scene(m, num)),
         })
+    state = board_state(m)
     return {
         "order": order,
         "cards": cards,
-        "saved": has_board(m),
+        "saved": state["saved"],
+        # Gap 20: `saved: true` used to be the entire story, so a board that no
+        # longer fitted the script rendered identically to one that did. These
+        # four fields are the difference between "your board is showing" and
+        # "your board is still on disk, and here is why it is not showing".
+        "stale": state["stale"],
+        "saved_order": state["saved_order"],
+        "changed_scenes": state["changed"],
+        "stale_reason": state["reason"],
+        "verified_by": state["verified_by"],
         "natural_order": [s.scene_number for s in doc.scenes],
     }
