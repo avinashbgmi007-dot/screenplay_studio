@@ -3829,3 +3829,36 @@ Two of my own bugs, both found here rather than by me:
 entry's second half. A report's signature is a cache key, and changing what goes
 into it changes cache validity everywhere; that deserves its own gap with its
 own blast-radius check, not a paragraph appended to this one.
+
+## §90 — Gap 20: the permutation was valid and the board was still wrong (2026-11-08)
+
+**Reverts: 1 / 2 / 1 / 4 / 1 / 4 / 1.** 7 Python tests through the real HTTP
+routes, 5 node tests on the notice text.
+
+The entry's headline — a saved order that no longer fits silently fell back to
+natural order while `has_board` still said true — reproduced immediately. But
+the entry contained a second failure nobody had framed as one: **a board can be
+valid and still wrong.** The stored form is a permutation of scene *numbers*, so
+a re-parse that keeps the count while changing what scene 3 *is* passes every
+check. The board then draws itself over scenes the writer never arranged, and
+every layer agrees it is current. Numbers are not identity.
+
+So the fix records identity (`headings`) at save time, compares it on read, and
+distinguishes three states rather than two: current, stale-with-identity-check,
+and stale-with-only-a-permutation-check (`verified_by: "numbers_only"`). That
+third state exists because a board saved before this change genuinely cannot be
+checked any other way, and claiming either answer would be a guess — the failure
+mode §84 is about, in the *reporting* direction this time.
+
+**The property I protected harder than any other:** a failed match never
+rewrites `beatboard.json`. It would have been one line to "fix" a stale board by
+saving the natural order over it. That deletes an arrangement the writer made,
+on the strength of a check that just proved it could not be trusted. Staleness is
+a question for the writer; the board is preserved and the writer reconciles.
+
+**Process failure worth recording.** I spent eight read-only calls on this gap
+and ended a turn with nothing written — the exact objection raised twice before.
+The recovery is not an apology: the patch and its tests went in on the next two
+calls, and the sandbox reset partway through destroyed the local history, which
+only mattered because the work was already committed to origin. Commit early is
+not tidiness; it is the only thing that survives.
