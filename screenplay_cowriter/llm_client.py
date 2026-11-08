@@ -18,6 +18,7 @@ from screenplay_analyzer.llm_client_base import (
     ModelNotFoundError,
     busy_retry_delay,
 )
+from screenplay_analyzer.http_transport import request_no_redirects
 
 
 class WatchdogTimeoutError(LlamaServerError):
@@ -86,7 +87,9 @@ class LlamaServerClient(BaseLlamaClient):
         attempt = 0
         while True:
             try:
-                resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout, headers=self.extra_headers)
+                resp = request_no_redirects("post", f"{self.base_url}/v1/chat/completions",
+                                            json=payload, timeout=self.timeout,
+                                            headers=self.extra_headers)
                 status = getattr(resp, "status_code", 200)
                 if self._check_busy(status, getattr(resp, "text", "") or "") and attempt < busy_retries:
                     attempt += 1
@@ -107,6 +110,8 @@ class LlamaServerClient(BaseLlamaClient):
                 ) from e
             except requests.exceptions.HTTPError as e:
                 raise LlamaServerError(f"llama-server request failed: {e}") from e
+            except requests.exceptions.RequestException as e:
+                raise LlamaServerError(f"llama-server transport refused the request: {e}") from e
             except (ValueError, requests.exceptions.JSONDecodeError) as e:
                 raise LlamaServerError(f"llama-server at {self.base_url} returned a non-JSON response: {e}") from e
 
@@ -148,8 +153,9 @@ class LlamaServerClient(BaseLlamaClient):
         if repeat_penalty is not None:
             payload["repeat_penalty"] = repeat_penalty
         try:
-            resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload,
-                                 timeout=self.timeout, headers=self.extra_headers, stream=True)
+            resp = request_no_redirects("post", f"{self.base_url}/v1/chat/completions",
+                                        json=payload, timeout=self.timeout,
+                                        headers=self.extra_headers, stream=True)
             if resp.status_code in (429, 503):
                 raise LlamaServerError("llama-server is busy with another request. Try again in a moment.")
             resp.raise_for_status()
@@ -162,6 +168,8 @@ class LlamaServerClient(BaseLlamaClient):
             ) from e
         except requests.exceptions.HTTPError as e:
             raise LlamaServerError(f"llama-server request failed: {e}") from e
+        except requests.exceptions.RequestException as e:
+            raise LlamaServerError(f"llama-server transport refused the request: {e}") from e
 
         # SSE has no charset by default; requests then decodes with ISO-8859-1,
         # turning every em dash into mojibake and Telugu into mush.

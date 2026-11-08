@@ -16,6 +16,8 @@ import time
 
 import requests
 
+from .http_transport import RedirectRefusedError, request_no_redirects
+
 # The context window a server reports changes only when the server restarts, and
 # a client is constructed per web request — so the probe result is cached by
 # base_url rather than per client. None is cached too: a build without /props
@@ -88,8 +90,11 @@ class BaseLlamaClient:
     def list_models_raw(self) -> list[dict]:
         """Raw /v1/models response dicts."""
         try:
-            resp = requests.get(f"{self.base_url}/v1/models", timeout=15, headers=self.extra_headers)
+            resp = request_no_redirects("get", f"{self.base_url}/v1/models",
+                                        timeout=15, headers=self.extra_headers)
             resp.raise_for_status()
+        except RedirectRefusedError as e:
+            raise LlamaServerError(str(e)) from e
         except requests.exceptions.ConnectionError as e:
             raise LlamaServerError(
                 f"Could not connect to llama-server at {self.base_url}. "
@@ -170,7 +175,8 @@ class BaseLlamaClient:
         that report it differently.
         """
         try:
-            resp = requests.get(f"{self.base_url}/props", timeout=3, headers=self.extra_headers)
+            resp = request_no_redirects("get", f"{self.base_url}/props",
+                                        timeout=3, headers=self.extra_headers)
             resp.raise_for_status()
             data = resp.json()
         except (requests.RequestException, ValueError):
@@ -209,8 +215,8 @@ class BaseLlamaClient:
         attempt = 0
         while True:
             try:
-                resp = requests.post(
-                    f"{self.base_url}/v1/chat/completions",
+                resp = request_no_redirects(
+                    "post", f"{self.base_url}/v1/chat/completions",
                     json=payload, timeout=eff_timeout, headers=self.extra_headers,
                 )
                 status = getattr(resp, "status_code", 200)
@@ -229,5 +235,7 @@ class BaseLlamaClient:
                 ) from e
             except requests.exceptions.HTTPError as e:
                 raise LlamaServerError(f"llama-server request failed: {e}") from e
+            except requests.exceptions.RequestException as e:
+                raise LlamaServerError(f"llama-server transport refused the request: {e}") from e
             except (ValueError, requests.exceptions.JSONDecodeError) as e:
                 raise LlamaServerError(f"llama-server at {self.base_url} returned a non-JSON response: {e}") from e

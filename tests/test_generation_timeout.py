@@ -55,7 +55,7 @@ def test_wall_clock_budget_caps_per_attempt_timeout():
     c = _client(timeout=600)
     seen = {}
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         seen["timeout"] = timeout
         return _json_response({"choices": [{"message": {"content": "{\"ok\": 1}"}}]})
 
@@ -70,7 +70,7 @@ def test_wall_clock_budget_stops_second_attempt():
     must not fire a second request that is born dead."""
     c = _client(timeout=600)
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         import requests as _r
         raise _r.exceptions.Timeout("hung")
 
@@ -88,7 +88,7 @@ def test_wall_clock_none_disables_budget():
     c = _client(timeout=600)
     seen = []
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         seen.append(timeout)
         return _json_response({"choices": [{"message": {"content": "{\"ok\": 1}"}}]})
 
@@ -122,7 +122,7 @@ def test_budget_error_message_reports_actual_attempts():
 
     calls = {"n": 0}
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         calls["n"] += 1
         import requests as _r
         raise _r.exceptions.Timeout("hung")
@@ -143,7 +143,7 @@ def test_default_budget_applies_without_opt_in():
     c = _client(timeout=600)
     seen = {}
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         seen["timeout"] = timeout
         return _json_response({"choices": [{"message": {"content": "{\"ok\": 1}"}}]})
 

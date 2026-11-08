@@ -19,6 +19,7 @@ import tempfile
 import requests
 
 from .net_guard import is_loopback_url
+from screenplay_analyzer.http_transport import request_no_redirects
 
 # "auto" lets whisper detect the spoken language per utterance
 _LANG_CODES = {"auto": None, "en": "en", "hi": "hi", "te": "te"}
@@ -142,8 +143,10 @@ def _transcribe_external(audio_bytes: bytes, filename: str, lang: str) -> dict:
     url = EXTERNAL_WHISPER_URL.rstrip("/")
     _assert_local_whisper(url)
     try:
-        resp = requests.post(f"{url}/inference", files={"file": (filename or "audio.webm", audio_bytes)},
-                             data={"response_format": "json"}, timeout=120)
+        resp = request_no_redirects(
+            "post", f"{url}/inference",
+            files={"file": (filename or "audio.webm", audio_bytes)},
+            data={"response_format": "json"}, timeout=120)
         resp.raise_for_status()
     except requests.RequestException as e:
         raise STTUnavailableError(

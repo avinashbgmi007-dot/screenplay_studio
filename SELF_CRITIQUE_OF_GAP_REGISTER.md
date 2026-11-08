@@ -4023,3 +4023,49 @@ not claim the browser badge was visually verified.
 **Reverts:** restoring the blocking fallback, restoring the streaming fallback,
 removing the empty-stream error, removing the empty blocking error, and removing
 the provisional browser cue each fail one focused regression test.
+
+## §95 — Gap 33: the allowed URL is not the whole route (2026-11-02)
+
+**Reverts: 10 / 1.** 11 tests in `tests/test_inference_redirects_and_proxy_environment.py`.
+
+The starting probe had already established the dangerous behavior with synthetic
+payloads and loopback mock servers: the analyzer, co-writer sync, co-writer SSE
+and external-local STT all followed a 307. The fix is one shared transport,
+not four copies of `allow_redirects=False`: every model GET/POST and STT request
+refuses any 3xx before a second hop, and explicit `proxies={http: None,
+https: None, all: None}` prevents Requests from silently consulting ambient
+proxy environment variables. The existing destination rule stays intact: webapp model endpoints are loopback
+unless the process launch opts in to remote; the analyzer CLI requires an
+explicit `--server` URL; STT is loopback-only. Existing connection-mode tests
+still prove the explicitly opted-in remote webapp configuration works directly.
+
+**The decision is refusal, not hop-validation.** A model API redirect can be
+made to work by validating each hop, resolving and pinning every host, checking
+scheme changes, and carefully handling auth/body replay. That is a larger and
+more brittle policy surface than the app needs: the operator already supplies
+the final inference URL. 301/302/303/307/308 are therefore all refused and the
+error asks the operator to configure the final URL. This may break a provider
+that requires redirects; that compatibility cost is intentional and documented.
+
+**The ambient proxy is also policy.** A request can have a correctly validated
+URL and still route through `HTTP_PROXY`/`ALL_PROXY`. A corporate proxy can be
+legitimate, but this desk has no explicit proxy consent/configuration surface.
+Silently inheriting it is not a safe default for private screenplay/audio
+payloads. Ambient proxies are disabled; a future explicit proxy feature must
+show its endpoint/consent rather than weakening this boundary implicitly.
+
+**What tests prove:** local redirector and destination servers see the 30x
+variants; the destination receives zero payloads. Actual client paths cover
+analyzer POST and GET, co-writer blocking and SSE, and external STT multipart
+audio. A local fake HTTP proxy with `HTTP_PROXY`, `http_proxy`, `ALL_PROXY`, and
+`all_proxy` set receives zero bytes while the analyzer's configured local
+destination gets the synthetic POST. No external host or private data is involved.
+
+**Remaining:** this does not pin the DNS resolution for an explicitly consented
+remote hostname. Redirects are impossible now, and arbitrary remote hosts still
+require the existing process-launch opt-in; DNS resolution of that configured
+host remains part of that opt-in's trust. No external-provider compatibility or
+real corporate proxy was tested, because neither is permitted by this policy.
+
+Reverts: restoring follow behavior (10 failures) / restoring ambient proxy
+routing (1 failure).

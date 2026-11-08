@@ -90,7 +90,7 @@ def test_payload_disables_thinking_when_grammar_present(monkeypatch):
                 "usage": {},
             }
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         captured["payload"] = json
         return FakeResp()
 
@@ -129,7 +129,7 @@ def test_payload_always_disables_thinking(monkeypatch):
         def json(self):
             return {"choices": [{"message": {"content": '{"ok": true}'}, "finish_reason": "stop"}], "usage": {}}
 
-    def fake_post(url, json=None, timeout=None, headers=None):
+    def fake_post(url, json=None, timeout=None, headers=None, **transport):
         captured["payload"] = json
         return FakeResp()
 
