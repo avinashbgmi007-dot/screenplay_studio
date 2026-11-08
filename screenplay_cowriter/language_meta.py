@@ -18,7 +18,12 @@ import json
 import re
 
 _LANGUAGE_ID_PATTERNS = [
-    re.compile(r"reads as (a )?(regional|tenglish|hinglish|indian)", re.I),
+    # Gap 29 (found while fixing it): the pattern demanded a QUALIFIER after
+    # "reads as" — regional / tenglish / indian — so the plainest form of the
+    # exact thing this filter exists for, "The dialogue reads as Telugu.", passed
+    # through untouched. Naming a language IS the identification.
+    re.compile(r"(reads|sounds|comes across) (as |like )?(a )?(regional |south indian )?"
+               r"(telugu|tamil|hindi|kannada|malayalam|tenglish|hinglish|indian)\b", re.I),
     re.compile(r"(comes across|comes off|sounds) (as |like )?(a )?(regional|tenglish|hinglish)", re.I),
     re.compile(r"probably (a )?(telugu|tamil|hindi|kannada|malayalam|tenglish|hinglish)", re.I),
     re.compile(r"likely (a )?(telugu|tamil|hindi|kannada|malayalam|tenglish|hinglish)", re.I),
@@ -54,11 +59,49 @@ def _matches_any(text: str) -> bool:
     return any(p.search(text) for p in _PATTERNS)
 
 
-def strip_language_meta(text: str) -> str:
+# Gap 29: a sentence about subtitles is meta-commentary UNLESS the writer asked
+# about subtitles. "Should I use subtitles?" is a real craft question about
+# accessibility, and answering it is not noise — it is the answer. The filter had
+# no idea what was asked, so it deleted the answer and the engine appended an
+# EMPTY assistant message: a silently delivered blank.
+_EXPLICIT_ASK = re.compile(
+    r"\b(subtitle|subtitles|caption|captions|closed caption|transl\w*|"
+    r"accessib\w*|non[- ]native|other language|another language|"
+    r"english[- ]speaking|readability)\b", re.I)
+
+
+def _writer_asked_about_language(user_text: str) -> bool:
+    return bool(user_text and _EXPLICIT_ASK.search(user_text))
+
+
+def language_filter_notice() -> str:
+    """Shown when the reply filter removed so much of an answer that keeping the
+    silence would be worse. Gap 29: the filter used to leave an EMPTY message,
+    which the writer could not tell from a failure."""
+    return ("(I kept my answer above even though it talks about subtitles and "
+            "translation — ask me directly about those and I will go into detail.)")
+
+
+def strip_language_meta(text: str, user_text: str = "") -> str:
     """Remove sentences/lines that are meta-commentary about the script's
     language. Craft sentences next to the meta commentary survive — only the
-    offending sentences are cut, so the reply keeps its flow and substance."""
+    offending sentences are cut, so the reply keeps its flow and substance.
+
+    Two guarantees this function now makes, both gap 29:
+
+    1. If the WRITER asked about subtitles / translation / accessibility, the
+       answer is kept. The filter exists to remove unsolicited commentary, not
+       to refuse a question.
+    2. It still returns "" when nothing survives — that is the documented
+       contract for a wholly-meta reply, and the caller is responsible for not
+       presenting an empty message as an answer. The bug gap 29 found was in the
+       CALLER: the engine appended the empty string to the session as if it were
+       a reply.
+    """
     if not text:
+        return text
+    if _writer_asked_about_language(user_text):
+        # They asked. Answering is the whole job.
         return text
     kept_lines = []
     for line in text.split("\n"):

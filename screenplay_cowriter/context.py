@@ -749,11 +749,23 @@ def extract_character_refs(text: str, script_ctx: ScriptContext) -> list:
             continue
         # 4) fuzzy best-match across names (diminutives): only the closest
         #    candidate, and only when it clears the similarity bar
+        # Gap 28: this `max()` had no candidate filter beyond the words' own
+        # length, so "Hi", "Yes" and any native-script utterance — none of which
+        # contain a Latin word of 4+ characters — raised ValueError("max() arg is
+        # an empty sequence") BEFORE a model was ever called. A one-word
+        # affirmation is not an edge case; it is most of what a writer types.
+        long_words = [w for w in words if len(w) >= 4]
+        if not long_words:
+            # No Latin word long enough to fuzzy-match. Fall through to the next
+            # candidate rather than inventing a name or crashing: an unmatched
+            # character is a legitimate answer, and a crash is not.
+            continue
         best, best_r = None, 0.0
         for other in presence:
             if len(other) < 4:
                 continue
-            r = max(SequenceMatcher(None, other, w.upper()).ratio() for w in words if len(w) >= 4)
+            r = max(SequenceMatcher(None, other, w.upper()).ratio()
+                    for w in long_words)
             if r > best_r:
                 best, best_r = other, r
         if best and best_r >= FUZZY_RATIO and best not in found:

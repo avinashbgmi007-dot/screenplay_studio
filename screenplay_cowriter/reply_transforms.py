@@ -15,12 +15,18 @@ from .language_meta import (
 from .persona_specs import strip_banned_phrases
 
 
-def clean_reply(raw: str) -> str:
+def clean_reply(raw: str, user_text: str = "") -> str:
     """Reply hygiene pipeline, outermost-raw to innermost-clean:
     unwrap accidental JSON wrappers, drop separator/tag garbage, collapse
-    semantic repetition blocks, then strip language meta-commentary."""
+    semantic repetition blocks, then strip language meta-commentary.
+
+    Gap 29: `user_text` is what the writer asked. The language filter needs it to
+    tell unsolicited commentary from the answer to a direct question, and without
+    it a reply to "should I use subtitles?" came back EMPTY.
+    """
     return strip_language_meta(
-        strip_repeated_blocks(strip_repetition_lines(strip_json_wrap(raw)))
+        strip_repeated_blocks(strip_repetition_lines(strip_json_wrap(raw))),
+        user_text=user_text,
     )
 
 

@@ -302,14 +302,24 @@ class CoWriterEngine:
         """
         from .language_mirror import mirror_reask_instruction, register_mismatch
 
-        reply = clean_reply(self._generate(messages, on_token))
+        raw = self._generate(messages, on_token)
+        reply = clean_reply(raw, user_text=user_text)
+        if not (reply or "").strip() and (raw or "").strip():
+            # Gap 29: the reply-side language filter deleted EVERY sentence of a
+            # real answer. Returning "" here made the engine store an empty
+            # assistant message -- indistinguishable from a crash, and the writer
+            # was shown a blank bubble instead of the answer the model gave.
+            # Cleaning may reduce a reply; it may not erase it.
+            from .language_mirror import language_filter_notice
+            reply = (raw.strip() + "\n\n" + language_filter_notice())
         if register_mismatch(user_text, reply) is None:
             return reply
         note = mirror_reask_instruction(user_text)
         if not note:
             return reply
         try:
-            retry = clean_reply(self._generate(messages + [{"role": "user", "content": note}]))
+            retry = clean_reply(self._generate(messages + [{"role": "user", "content": note}]),
+                                user_text=user_text)
         except Exception:
             return reply
         if register_mismatch(user_text, retry) is not None:

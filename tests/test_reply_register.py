@@ -334,7 +334,12 @@ def test_the_helper_exists_on_the_engine_and_is_used_by_both_paths():
     around the helper."""
     assert hasattr(CoWriterEngine, "_generate_mirrored")
     src = open(eng_mod.__file__, encoding="utf-8").read()
-    assert src.count("clean_reply(self._generate(messages, on_token))") == 1
+    # Gap 29: the first generation is now captured into `raw` before cleaning,
+    # so an emptied reply can be recovered instead of stored blank. What must
+    # still hold is that exactly ONE raw generation happens inside the helper and
+    # exactly two call sites go through it -- the property this guard is for.
+    assert src.count("raw = self._generate(messages, on_token)") == 1
+    assert src.count("clean_reply(raw, user_text=user_text)") == 1
     assert src.count("self._generate_mirrored(messages, user_text, on_token)") == 2
 
 
