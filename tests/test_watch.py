@@ -18,6 +18,7 @@ def _write_script(watch_dir, name="batch.fountain"):
             "Mara sits at the table.\n\n"
             "MARA\nI promise I'll explain everything.\n"
         )
+    open(path + ".ready", "wb").close()
     return path
 
 
@@ -45,6 +46,7 @@ class TestProcessPending:
         os.makedirs(watch_dir)
         open(os.path.join(watch_dir, "notes.txt.bak"), "w").write("ignore me")
         open(os.path.join(watch_dir, "README.md"), "w").write("# Not a script\n")  # .md IS supported
+        open(os.path.join(watch_dir, "README.md.ready"), "wb").close()
 
         results = process_pending(watch_dir, projects_dir, "http://127.0.0.1:9")
         names = [r["filename"] for r in results]

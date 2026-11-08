@@ -26,9 +26,11 @@ python -m screenplay_studio resume ./proj --retry-failed
 # Show stage status
 python -m screenplay_studio status ./proj
 
-# Auto-analyze screenplays dropped into a folder (poll loop)
+# Auto-analyze screenplays published into a folder (poll loop)
 python -m screenplay_studio watch ./inbox --projects-dir ./watched_projects --poll 5
-python -m screenplay_studio watch ./inbox --once    # process what's there and exit
+# Publish completion only after closing the source; atomic rename from a temp name is preferred.
+python -c "from pathlib import Path; Path('inbox/my_script.fountain.ready').touch()"
+python -m screenplay_studio watch ./inbox --once    # unmarked inputs remain pending
 
 # Web app (Flask, default port 8500) — separate module, not a studio subcommand.
 # Binds 127.0.0.1 only and mints a capability token on launch (gap 85: the
@@ -45,7 +47,7 @@ python -m screenplay_studio.webapp_server --demo-model
 | `run [source] --project DIR` | `--title`, `--server`, `--model`, `--categories`, `--only {parse,analyze,chat}`, `--skip-chat`, `--retry-failed`, `--lang {eng,tenglish,hindi,tamil}`, `--memory-path`, `--no-memory` | `source` only needed for a new project; existing projects resume. |
 | `resume DIR` | `--server`, `--model`, `--skip-chat`, `--retry-failed`, `--lang`, `--memory-path`, `--no-memory` | Skips completed stages. |
 | `status DIR` | — | Prints parse/analyze/chat status + errors. |
-| `watch DIR` | `--projects-dir`, `--server`, `--model`, `--poll SECS`, `--once`, `--categories`, `--lang` | Detects supported extensions; creates one project per file. |
+| `watch DIR` | `--projects-dir`, `--server`, `--model`, `--poll SECS`, `--once`, `--categories`, `--lang` | Processes a supported source only when `<filename>.<extension>.ready` exists; unmarked inputs stay in the inbox and are reported pending. Create the marker only after closing/publishing the file. |
 | `webapp_server` (module) | `--port` (default 8500), `--projects-dir`, `--server`, `--api-key`, `--demo-model`, `--allow-remote-server`, `--no-token` (default: token ON) | Serves the SPA + JSON API. Run as `python -m screenplay_studio.webapp_server`. **Secure by default:** a per-process capability token is minted on every launch and set as a `SameSite=Strict` cookie on `/`; mutating requests must echo it as `X-Studio-Token`. Your browser gets it automatically; scripted clients (curl, the E2E harness) pass `--no-token` on a loopback-only machine. `--require-token` is retained for compatibility but has no effect -- it prints a deprecation notice rather than being silently ignored. **Local-only by default:** `--server` must point at this machine (localhost / 127.0.0.0/8 / ::1), because every analysis and chat turn sends your script to that URL. A remote URL is refused at launch; pass `--allow-remote-server` (or set `SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1`) to opt in deliberately. The opt-in is a startup decision and can never be granted over HTTP. **Two places a model can live, one Settings form:** `--api-key` (or `$SCREENPLAY_STUDIO_API_KEY`, so a launcher script need not put a secret in shell history) supplies the bearer token for a remote endpoint. The Settings modal in the SPA has a Local/Remote switch over the SAME fields — URL, model, fast model, timeout — with the mode *derived* from the URL by the server, so it cannot drift. The token is stored in the process config and in each project manifest and is **never** returned to the browser (`/api/config` reports `api_key_set`, `connection_mode`, `allow_remote`). |
 
 

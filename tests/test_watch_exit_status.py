@@ -60,6 +60,11 @@ def _repo_root():
 
 
 def _watch(directory, projects, extra=()):
+    # Existing CLI contract tests submit completed inputs; gap 37 makes that
+    # producer assertion explicit with a sibling readiness marker.
+    for path in directory.iterdir() if directory.exists() else ():
+        if path.suffix.lower() in {".fdx", ".fountain", ".txt", ".md", ".pdf"}:
+            path.with_name(path.name + ".ready").touch()
     return ["watch", str(directory), "--projects-dir", str(projects), "--once", *extra]
 
 
@@ -84,6 +89,25 @@ def test_a_mixed_batch_exits_nonzero(tmp_path, inbox):
     code, out, _ = _run(_watch(inbox, tmp_path / "projects"), _repo_root())
     assert "FAILED" in out
     assert code != 0
+
+
+def test_unmarked_supported_file_reports_pending_and_exits_nonzero(tmp_path, inbox):
+    source = inbox / "still-copying.fountain"
+    source.write_text(GOOD_FOUNTAIN)
+    projects = tmp_path / "projects"
+    code, out, err = _run([
+        "watch", str(inbox), "--projects-dir", str(projects), "--once", "--json",
+    ], _repo_root())
+
+    assert code == cli.WATCH_EXIT_PARTIAL
+    assert "PENDING: still-copying.fountain" in out
+    assert "PENDING 1 file(s)" in err
+    payload = next(json.loads(line) for line in out.splitlines() if line.startswith("{"))
+    assert payload["pending"] == 1
+    assert payload["failed"] == 0
+    assert payload["results"][0]["pending"] is True
+    assert source.read_text() == GOOD_FOUNTAIN
+    assert projects.exists() and list(projects.iterdir()) == []
 
 
 def test_an_empty_folder_exits_zero(tmp_path, inbox):
@@ -119,6 +143,12 @@ def test_the_batch_code_rule_is_pure_and_its_own_function():
     assert cli.watch_exit_code([ok, ok]) == cli.WATCH_EXIT_OK
     assert cli.watch_exit_code([bad]) == cli.WATCH_EXIT_PARTIAL
     assert cli.watch_exit_code([ok, bad]) == cli.WATCH_EXIT_PARTIAL
+
+
+def test_pending_input_is_a_partial_batch_not_a_success():
+    pending = {"filename": "draft.fountain", "ok": False, "pending": True,
+               "project": None, "error": "waiting for marker"}
+    assert cli.watch_exit_code([pending]) == cli.WATCH_EXIT_PARTIAL
 
 
 def test_partial_failure_is_1_and_not_the_usage_code():

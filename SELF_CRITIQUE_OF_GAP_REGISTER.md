@@ -4173,3 +4173,56 @@ checks, including **9 focused cache-refresh tests**, Ruff clean, and the full su
 (**3159 passed, 8 skipped, 2 warnings**). All seven independent reverts above
 produced nonzero expected failures. The behavior is proven with fake responses
 and a fake clock only; no model server was contacted.
+
+## §98 — Gap 37: a file in the inbox is not necessarily finished (review before implementation)
+
+**Finding:** `process_pending()` treats directory visibility as producer completion: it atomically moves every supported name into `.processing/`, immediately copies/parses/analyzes it, then files the claimed inode into `done/`. The claim solves duplicate workers (gap 16), not an active producer. On POSIX an open writer can continue appending after the rename; a short quiet-period or size check cannot distinguish “finished” from “paused during a slow copy”. A content hash before/after analysis can catch writes during that interval, but cannot establish that a paused producer will never resume after the final check. Network-share timestamp caching and Windows rename/share rules make a portable open-handle heuristic even less credible.
+
+**Self-critique of the tempting fixes:**
+
+- A one-second stable-size window would make the reproduction less likely but is not a completion guarantee; a slow upload can pause longer. Advertising it as a fix would contradict the register's own caution.
+- Merely hashing before and after analysis catches an important mutation window, but not a later append through a still-open handle. It is defense in depth, not producer completion.
+- Moving the source to `.processing/` is not a producer handshake: on POSIX, the writer's open file descriptor continues to name the same inode after rename.
+- Requiring a new sidecar changes watch-folder UX and makes `watch --once` report pending inputs. That is real friction, but a protocol that claims completion only after an explicit signal is the honest cross-platform boundary.
+
+**Recommended path to implement:** require a sibling `<filename>.<extension>.ready` marker, created only after the producer has closed and published the source (prefer write-to-temporary + same-filesystem atomic rename, then create marker). Without it, leave the source untouched and report `pending`, never parse it or move it to `done/`. Claim source and marker together into the existing per-file `.processing/` directory; consume the marker after the attempt, and tell failure-note readers to republish the marker when retrying. Hash the claimed source before work and verify it again before success; if it changes despite the producer contract, remove the partial project and file the complete source as failed. Update `watch --once` output/exit semantics and docs so an unmarked file cannot look like a completed batch. Keep gap 16's collision-safe filing and atomic claims intact.
+
+**Limits:** no consumer can prove a producer obeyed the ready protocol if that producer continues writing after publishing. The marker is an explicit completion assertion, not cryptographic attestation. A post-analysis content check catches writes during processing; a producer that writes after the final check remains outside the protocol. Network shares and Windows were not available here; the contract avoids depending on their open-file/mtime heuristics, but their atomic rename behavior still depends on same-filesystem producer operations. No real screenplay is needed for validation.
+
+**Implementation/self-review result for §98:** watch mode now processes only a
+supported source with a regular sibling `<filename>.<extension>.ready` marker.
+An unmarked source remains byte-for-byte in the inbox and returns `pending`; the
+watch loop announces that state once per arrival, and `watch --once` prints it
+and exits 1. The producer marker moves into the same `.processing/<claim>/`
+folder as the source before any parse work; if that pairing fails, the claim is
+left visible rather than restored with an overwrite-prone `os.replace`. If the
+OS refuses to claim a still-open source, it is reported pending while both
+source and marker remain in the inbox. Success and failure consume the marker;
+the failure note explicitly says to recreate it when retrying. SHA-256 plus file identity/size/timestamps are verified before
+and after processing, including after parser/analyzer errors; changed inputs do
+not leave a project that could be mistaken for analysis of the final bytes.
+Gap 16's collision-safe `done/`/`failed/` filing and source claim were kept.
+
+The new synthetic tests cover an open writer held across multiple polls, no
+processing before the completion marker, marker-link refusal, OS-level claim
+refusal, mutation during analysis, cleanup of the partial project, retry
+guidance, and CLI pending semantics. Independent reversions caused expected failures: remove readiness
+requirement **3 failed**; remove content verification **1**; treat pending as
+success in `watch --once` **2**; leave the readiness marker out of the atomic
+claim **1**; remove marker retry guidance **1**. Reverts: 3 / 1 / 2 / 1 / 1.
+
+**Limits:** a ready marker is a producer assertion, not proof that a buggy
+producer will never write again. If the producer violates the contract before
+worker fingerprinting and then stops, no consumer can reconstruct intent; if it
+writes during processing, the post-check catches it. We do not claim Windows or
+network-share execution from the local filesystem test. The UX is intentionally
+stricter: direct drops without a sibling `.ready` are pending, and the docs now
+show how to publish with a same-filesystem atomic rename followed by marker
+creation.
+
+
+**Validation for gap 37:** `tools/gap_harness/close_gap.py check 37` passed all
+checks, including **34 watch-related tests**, Ruff clean, and the full suite
+(**3166 passed, 8 skipped, 2 warnings**). The five independent reverts above
+produced nonzero expected failures. All inputs were synthetic temporary files;
+no screenplay or model server was used.

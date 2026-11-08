@@ -38,6 +38,7 @@ def _drop(watch_dir: str, name: str, marker: str) -> str:
     path = os.path.join(watch_dir, name)
     with open(path, "w", encoding="utf-8") as f:
         f.write(_script(marker))
+    open(path + ".ready", "wb").close()
     return path
 
 
@@ -301,6 +302,7 @@ def test_a_failed_drop_is_retryable_by_moving_it_back(tmp_path, monkeypatch):
 
     # The writer follows the note: move it back.
     os.replace(os.path.join(watch, first["filed"]), src)
+    open(src + ".ready", "wb").close()
     os.unlink(src + ".error.txt") if os.path.exists(src + ".error.txt") else None
 
     monkeypatch.undo()

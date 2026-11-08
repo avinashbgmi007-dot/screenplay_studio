@@ -298,13 +298,14 @@ def main():
     p_status.add_argument("project", help="Project directory")
     p_status.set_defaults(func=cmd_status)
 
-    p_watch = sub.add_parser("watch", help="Auto-analyze screenplays dropped into a folder")
-    p_watch.add_argument("watch_dir", help="Folder to watch for new screenplays")
+    p_watch = sub.add_parser("watch", help="Auto-analyze screenplays published into a folder")
+    p_watch.add_argument("watch_dir", help="Folder to watch for screenplays and their .ready markers")
     p_watch.add_argument("--projects-dir", default="./watched_projects", help="Where to create projects")
     p_watch.add_argument("--server", default="http://localhost:8080", help="llama-server base URL")
     p_watch.add_argument("--model", help="Explicit model id override")
     p_watch.add_argument("--poll", type=int, default=5, help="Seconds between scans (default 5)")
-    p_watch.add_argument("--once", action="store_true", help="Process whatever's there once and exit (no loop)")
+    p_watch.add_argument("--once", action="store_true",
+                         help="Process ready screenplays once; unmarked inputs remain pending")
     p_watch.add_argument("--json", action="store_true",
                          help="With --once, also print a machine-readable per-file summary to stdout")
     p_watch.add_argument("--categories", help="Comma-separated analyzer categories to run")
@@ -365,7 +366,7 @@ def _resolve_run_paths(parser, args) -> None:
 # register asked for defined semantics rather than a bare nonzero, so:
 #
 #   0  every requested file was processed successfully
-#   1  the batch ran but at least one file failed (partial failure)
+#   1  the batch ran but at least one file failed or is still pending a ready marker
 #   2  usage / configuration error (argparse, bad directory) — the CLI's
 #      existing convention, see `_load_project`
 #
@@ -404,6 +405,9 @@ def cmd_watch(args):
             print(f"ERROR: cannot read the watch folder '{args.watch_dir}': {e}", file=sys.stderr)
             sys.exit(WATCH_EXIT_ERROR)
         for r in results:
+            if r.get("pending"):
+                print(f"PENDING: {r['filename']} → {r.get('error')}")
+                continue
             status = "OK" if r.get("ok") else "FAILED"
             print(f"{status}: {r['filename']} → {r.get('project') or r.get('error')}")
         if getattr(args, "json", False):
@@ -413,19 +417,24 @@ def cmd_watch(args):
                 "ok": watch_exit_code(results) == WATCH_EXIT_OK,
                 "total": len(results),
                 "succeeded": sum(1 for r in results if r.get("ok")),
-                "failed": sum(1 for r in results if not r.get("ok")),
+                "failed": sum(1 for r in results if not r.get("ok") and not r.get("pending")),
+                "pending": sum(1 for r in results if r.get("pending")),
                 "results": [
                     {"filename": r.get("filename"), "ok": bool(r.get("ok")),
+                     "pending": bool(r.get("pending")),
                      "project": r.get("project"), "error": r.get("error")}
                     for r in results
                 ],
             }))
         code = watch_exit_code(results)
         if code == WATCH_EXIT_PARTIAL:
-            failed = sum(1 for r in results if not r.get("ok"))
-            # A non-zero exit with no explanation in the stream is its own trap.
-            print(f"FAILED {failed} of {len(results)} file(s); see above.",
-                  file=sys.stderr)
+            failed = sum(1 for r in results if not r.get("ok") and not r.get("pending"))
+            pending = sum(1 for r in results if r.get("pending"))
+            if failed:
+                print(f"FAILED {failed} of {len(results)} file(s); see above.", file=sys.stderr)
+            if pending:
+                print(f"PENDING {pending} file(s) remain in the inbox until a .ready marker is published.",
+                      file=sys.stderr)
         sys.exit(code)
     watch_loop(args.watch_dir, args.projects_dir, args.server,
                poll_interval=args.poll, model=args.model, categories=categories, report_language=args.lang)

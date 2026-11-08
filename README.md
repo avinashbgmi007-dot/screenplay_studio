@@ -222,10 +222,19 @@ The analysis report can be produced in the language the script is in:
 ```bash
 python -m screenplay_studio run my_script.fountain --project ./p --lang tenglish
 python -m screenplay_studio watch ./inbox --lang hindi
+# After the producer has closed/published the source, signal completion:
+python -c "from pathlib import Path; Path('inbox/my_script.fountain.ready').touch()"
 ```
 
 In the web app, pick "Report in" next to **Run Analysis**. Quotes in the
 report stay verbatim from the script so verification still works.
+
+Watch-folder inputs require a sibling `<filename>.<extension>.ready` marker.
+Create it only after the source is closed; for automation, write to a temporary
+name, close it, atomically rename it into the inbox on the same filesystem, then
+create the marker. An unmarked screenplay stays in place and `watch --once`
+reports it as pending (exit 1), rather than guessing that a quiet file is done.
+When retrying a file from `failed/`, move it back and recreate the marker.
 
 ## Known limitations
 
