@@ -1,9 +1,11 @@
 """Atomic JSON persistence for the studio's file-backed stores.
 
-Every store that the webapp writes (manifests, ideas, notes, stash, beat
-board) must go through `atomic_write_json`: a crash mid-write then leaves a
-`.tmp` behind instead of a torn JSON file, and a concurrent reader either sees
-the old bytes or the new ones — never a half-written document.
+Every existing store document that the webapp updates (manifests, ideas, notes,
+stash, beat board) goes through `atomic_write_json`: a crash mid-write then
+leaves a `.tmp` behind instead of a torn JSON file, and a concurrent reader sees
+either the old bytes or the new ones. New sessions use `atomic_create_json`,
+which publishes a complete file with no-clobber semantics; create and update are
+different operations and must not share overwrite behavior.
 
 Two writers can race on one store, and they need different locks:
 
@@ -580,6 +582,43 @@ def atomic_write_json(path: str, data, mode: int = 0o666) -> None:
                 pass
             raise
         _fsync_dir(os.path.dirname(os.path.abspath(path)))
+
+
+def atomic_create_json(path: str, data, mode: int = 0o666) -> bool:
+    """Atomically publish a new JSON file without replacing an existing one.
+
+    Returns ``True`` when this call claimed `path`, and ``False`` when another
+    creator already owns it. The complete, fsynced temporary file is linked to
+    the destination in the same directory: `os.link` is an atomic no-clobber
+    operation, unlike `os.replace`. A collision never edits the existing file.
+    The temporary name is unique per attempt and cleanup is attempted on every
+    exit; an interrupted cleanup can leave only the non-JSON `.create.tmp` name.
+
+    On filesystems that do not support hard links this fails closed with the
+    underlying `OSError`; it must never fall back to an overwriting rename.
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    with _lock_for(path):
+        tmp = f"{path}.{os.getpid()}.{uuid.uuid4().hex}.create.tmp"
+        fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_EXCL, mode)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                return False
+            _fsync_dir(directory)
+            return True
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                # The final hard link (if any) is already committed. A leftover
+                # uniquely named temp must not make a successful claim look failed.
+                pass
 
 
 # IDs come from URL path segments; anything outside this charset is a probe,

@@ -18,6 +18,11 @@ import uuid
 from dataclasses import dataclass, field, asdict
 
 
+def _new_session_id() -> str:
+    """A long UUID candidate; SessionStore publishes it with no-clobber semantics."""
+    return uuid.uuid4().hex
+
+
 def _legacy_message_id(d: dict) -> str:
     """A deterministic id for a message saved before ids existed."""
     import hashlib
@@ -224,9 +229,10 @@ class Session:
         # truncate-then-write — a crash mid-save (or a reader opening between
         # the truncate and the write) could see an empty or half-written
         # session, and the conversation is the most valuable store here. It is
-        # the ONLY writer of a session file, so routing it through jsonio's
-        # unique-tmp + fsync + replace gives every session the cross-process
-        # guarantee as well.
+        # the updater of an existing session file, so routing it through
+        # jsonio's unique-tmp + fsync + replace gives every update the
+        # cross-process guarantee as well. SessionStore publishes new sessions
+        # through the separate no-clobber creation path.
         self.updated_at = time.time()
         directory = os.path.dirname(path)
         if directory:
@@ -241,4 +247,5 @@ class Session:
 
     @staticmethod
     def new(title: str, report_path: str | None = None, script_path: str | None = None) -> "Session":
-        return Session(session_id=str(uuid.uuid4())[:8], title=title, report_path=report_path, script_path=script_path)
+        return Session(session_id=_new_session_id(), title=title,
+                       report_path=report_path, script_path=script_path)

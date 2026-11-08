@@ -31,6 +31,12 @@ EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 # view and backward-compat; `auto_title` means the shelf title follows the
 # page's first line until the writer renames it by hand.
 MAX_AUTO_TITLE_LEN = 48
+_ID_CREATE_ATTEMPTS = 32
+
+
+def _new_idea_id() -> str:
+    """A long UUID candidate; `create` still claims it exclusively."""
+    return uuid.uuid4().hex
 
 
 class IdeaStore:
@@ -55,19 +61,30 @@ class IdeaStore:
     # ---- CRUD ----
 
     def create(self, title: str = "Untitled idea") -> dict:
-        idea_id = uuid.uuid4().hex[:8]
-        os.makedirs(self._dir(idea_id), exist_ok=True)
-        meta = {
-            "id": idea_id,
-            "title": title or "Untitled idea",
-            "created_at": time.time(),
-            "updated_at": time.time(),
-            "card": dict(EMPTY_CARD),
-            "content": "",
-            "auto_title": True,
-        }
-        self._write(idea_id, meta)
-        return meta
+        for _ in range(_ID_CREATE_ATTEMPTS):
+            idea_id = _new_idea_id()
+            idea_dir = self._dir(idea_id)
+            try:
+                # mkdir without exist_ok is the atomic identity claim. A check
+                # followed by makedirs(exist_ok=True) lets a collision write into
+                # an existing writer-owned idea directory.
+                os.mkdir(idea_dir)
+            except FileExistsError:
+                continue
+
+            meta = {
+                "id": idea_id,
+                "title": title or "Untitled idea",
+                "created_at": time.time(),
+                "updated_at": time.time(),
+                "card": dict(EMPTY_CARD),
+                "content": "",
+                "auto_title": True,
+            }
+            self._write(idea_id, meta)
+            return meta
+        raise RuntimeError(
+            f"Could not allocate a unique idea id after {_ID_CREATE_ATTEMPTS} attempts.")
 
     def load(self, idea_id: str) -> dict:
         # reader-side bounded retry: a concurrent tmp+os.replace can make the

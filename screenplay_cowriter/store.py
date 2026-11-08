@@ -55,6 +55,9 @@ class SessionUnreadableError(Exception):
     """
 
 
+_SESSION_CREATE_ATTEMPTS = 32
+
+
 class SessionStore:
     def __init__(self, sessions_dir: str = "./sessions"):
         self.sessions_dir = sessions_dir
@@ -70,9 +73,19 @@ class SessionStore:
         return os.path.join(self.sessions_dir, f"{session_id}.json")
 
     def create(self, title: str, report_path: str = None, script_path: str = None) -> Session:
-        session = Session.new(title=title, report_path=report_path, script_path=script_path)
-        session.save(self._path(session.session_id))
-        return session
+        from screenplay_studio.jsonio import atomic_create_json
+
+        for _ in range(_SESSION_CREATE_ATTEMPTS):
+            session = Session.new(title=title, report_path=report_path,
+                                  script_path=script_path)
+            # Creation must claim the filename without replacing it. `save`
+            # intentionally has replace semantics for later updates; using it
+            # here let an ID collision destroy the existing conversation.
+            if atomic_create_json(self._path(session.session_id), session.to_dict()):
+                return session
+        raise RuntimeError(
+            "Could not allocate a unique session id after "
+            f"{_SESSION_CREATE_ATTEMPTS} attempts.")
 
     def load(self, session_id: str) -> Session:
         path = self._path(session_id)
