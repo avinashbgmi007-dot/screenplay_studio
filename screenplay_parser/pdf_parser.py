@@ -188,14 +188,21 @@ def _bitmap_to_png_bytes(bitmap) -> bytes:
     return buf.getvalue()
 
 
-def _ocr_extract(pdf_path: str, engine) -> list[str]:
+def _ocr_extract(pdf_path: str, engine, pages: set | None = None) -> list[str]:
     """Render each page to an image and OCR it; return a text line list with
-    synthetic blank lines at page breaks (same shape as the text-layer path)."""
+    synthetic blank lines at page breaks (same shape as the text-layer path).
+
+    Gap 25: `pages` (1-based) restricts OCR to those pages, so a document with
+    one image-only page can be read without re-OCRing the pages whose text layer
+    already worked — and without the two halves needing to agree on layout.
+    """
     import pypdfium2 as pdfium
 
     lines: list[str] = []
     pdf = pdfium.PdfDocument(pdf_path)
     for i in range(len(pdf)):
+        if pages is not None and (i + 1) not in pages:
+            continue
         page = pdf[i]
         bitmap = page.render(scale=200 / 72)  # ~200 dpi
         png = _bitmap_to_png_bytes(bitmap)
@@ -229,18 +236,27 @@ def _ocr_extract(pdf_path: str, engine) -> list[str]:
     return lines
 
 
-def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict, dict]:
+def _extract_reconstructed_lines(pdf_path: str, blank_pages: list | None = None,    # noqa: PLR0913
+                                 page_total: list | None = None
+                                 ) -> tuple[list[str], dict, dict]:
     """Returns (lines, page_of_line, line_layout): the reconstructed plain-text
     lines (with synthetic blank lines at paragraph breaks, glyph doubling
     collapsed, and page-number footers dropped), each line's source page, and
     each line's relative column band ('left'|'dialogue'|'center'|'right') —
     the layout hint the shared classifier uses to disambiguate dialogue vs.
-    action and to catch right-aligned transitions."""
+    action and to catch right-aligned transitions.
+
+    Gap 25: `blank_pages`, if given, is filled with the 1-based numbers of pages
+    that yielded NO text. They used to be `continue`d away, which is how a
+    two-page PDF with an image-only second page came back looking complete: the
+    global check saw text (from page 1) and never looked per page."""
     lines: list[str] = []
     page_of_line: dict[int, int] = {}
     line_layout: dict[int, str] = {}
 
     with pdfplumber.open(pdf_path) as pdf:
+        if page_total is not None:
+            page_total.append(len(pdf.pages))
         for page_index, page in enumerate(pdf.pages, start=1):
             try:
                 page_lines = page.extract_text_lines(layout=False, strip=True)
@@ -248,6 +264,8 @@ def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict, dict]:
                 page_lines = []
 
             if not page_lines:
+                if blank_pages is not None:
+                    blank_pages.append(page_index)
                 continue
 
             width = page.width or 1.0
@@ -282,9 +300,96 @@ def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict, dict]:
     return lines, page_of_line, line_layout
 
 
+def _page_list(pages) -> str:
+    """1, 2, 5-9 — a page list a writer can act on."""
+    nums = sorted(pages)
+    if not nums:
+        return "none"
+    out, start, prev = [], nums[0], nums[0]
+    for n in nums[1:]:
+        if n == prev + 1:
+            prev = n
+            continue
+        out.append(f"{start}-{prev}" if prev > start else str(start))
+        start = prev = n
+    out.append(f"{start}-{prev}" if prev > start else str(start))
+    return ", ".join(out)
+
+
+def _coverage(total: int, blank_pages, recovered_pages=None):
+    """Gap 25: per-page provenance, so "we read 1 of 2 pages" is a number the
+    desk can print instead of a global "complete" nobody can check."""
+    recovered = set(recovered_pages or ())
+    blank = set(blank_pages or ())
+    unread = sorted(p for p in blank if p not in recovered)
+    return {
+        "total_pages": total,
+        "pages_without_text": sorted(blank),
+        "pages_recovered_by_ocr": sorted(recovered),
+        "pages_unread": unread,
+        "read_pages": max(0, total - len(unread)),
+        "complete": not unread,
+    }
+
+
 def parse_pdf(path: str):
     filename = os.path.basename(path)
-    lines, page_of_line, line_layout = _extract_reconstructed_lines(path)
+    blank_pages: list = []
+    page_total: list = []
+    lines, page_of_line, line_layout = _extract_reconstructed_lines(
+        path, blank_pages, page_total)
+    total = (page_total[0] if page_total else 0) or len(blank_pages)
+    # Gap 25: completeness used to be judged GLOBALLY — "did anything extract?" —
+    # so a two-page PDF whose second page was an image came back looking whole:
+    # page 1 satisfied the check and page 2 was silently dropped. The unit of
+    # judgment has to be the page, because that is the unit the writer lost.
+    if lines and any(ln.strip() for ln in lines) and blank_pages:
+        engine = _get_ocr_engine()
+        if engine is not None:
+            ocr_lines = _ocr_extract(path, engine, pages=set(blank_pages))
+            recovered = [ln for ln in ocr_lines if ln.strip()]
+            doc = _parse_lines(lines + [""] + ocr_lines,
+                               source_format="pdf", filename=filename,
+                               page_of_line=page_of_line, line_layout=line_layout)
+            if recovered:
+                # Which pages were rescued is a FACT about this parse, and the
+                # writer needs it: OCR text is weaker evidence than a text layer.
+                doc.parse_confidence = "low"
+                doc.warnings.insert(0, ParseWarning(
+                    message=(f"{len(blank_pages)} of this PDF's pages had no extractable "
+                             f"text (page(s) {_page_list(blank_pages)}) and were read via "
+                             "OCR instead. OCR misreads names, numbers and punctuation — "
+                             "spot-check every citation from those pages. Pages whose text "
+                             "layer worked were NOT re-read by OCR."),
+                    severity="warning",
+                ))
+                doc.page_coverage = _coverage(total, blank_pages,
+                                              recovered_pages=set(blank_pages))
+                return doc
+            # OCR ran and produced nothing: those pages are UNREAD, not empty.
+            doc.parse_confidence = "low"
+            doc.warnings.insert(0, ParseWarning(
+                message=(f"Page(s) {_page_list(blank_pages)} of this PDF could not be read: "
+                         "they carry no extractable text, and OCR found nothing on them. "
+                         "That text is MISSING from this analysis, not absent from the "
+                         "script. Re-export as .fdx or .fountain for full coverage."),
+                severity="error",
+            ))
+            doc.page_coverage = _coverage(total, blank_pages)
+            return doc
+        doc = _parse_lines(lines, source_format="pdf", filename=filename,
+                           page_of_line=page_of_line, line_layout=line_layout)
+        doc.parse_confidence = "low"
+        doc.warnings.insert(0, ParseWarning(
+            message=(f"Page(s) {_page_list(blank_pages)} of this PDF carry no extractable "
+                     "text and no OCR engine is available, so their content is MISSING "
+                     "from this parse. Analysis of the scenes on those pages cannot be "
+                     "trusted. Re-export as .fdx or .fountain, or install tesseract + "
+                     "pytesseract so the OCR path can read them."),
+            severity="error",
+        ))
+        doc.page_coverage = _coverage(total, blank_pages)
+        return doc
 
     if _looks_unrecoverable(lines) or not lines or not any(ln.strip() for ln in lines):
         engine = _get_ocr_engine()

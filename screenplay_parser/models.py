@@ -131,6 +131,11 @@ class ScriptDocument:
     front_matter: list[Element] = field(default_factory=list)  # title page etc.
     warnings: list[ParseWarning] = field(default_factory=list)
     parse_confidence: str = "high"  # "high" | "medium" | "low" — set by format-specific parsers
+    # Gap 25: per-PAGE provenance for paged sources (PDF). None for formats that
+    # are not paginated by the parser, so "no coverage record" can never be read
+    # as "we read everything". A PDF that lost a page used to look identical to
+    # one that did not, because completeness was judged globally.
+    page_coverage: Optional[dict] = None
 
     @property
     def all_characters(self) -> list[str]:
@@ -155,6 +160,7 @@ class ScriptDocument:
             "source_format": self.source_format,
             "source_filename": self.source_filename,
             "parse_confidence": self.parse_confidence,
+            "page_coverage": self.page_coverage,
             "scene_count": self.scene_count,
             "estimated_page_count": self.estimated_page_count,
             "all_characters": self.all_characters,
@@ -182,6 +188,7 @@ class ScriptDocument:
             source_filename=d.get("source_filename", ""),
             parse_confidence=d.get("parse_confidence", "high"),
         )
+        doc.page_coverage = d.get("page_coverage")
         doc.front_matter = [
             Element(type=ElementType(e["type"]), text=e["text"], character=e.get("character"),
                     line_start=e.get("line_start"), spans=_spans_from(e))
