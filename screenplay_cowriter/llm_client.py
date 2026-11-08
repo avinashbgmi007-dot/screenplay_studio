@@ -95,6 +95,11 @@ class LlamaServerClient(BaseLlamaClient):
                     attempt += 1
                     time.sleep(busy_retry_delay(attempt))
                     continue
+                if self._invalidate_context_window_on_rejection(resp):
+                    raise LlamaServerError(
+                        "llama-server rejected the request as too large. The cached context estimate "
+                        "was cleared; retry to rebuild the prompt, and reduce it if the error repeats."
+                    )
                 resp.raise_for_status()
                 data = resp.json()
                 break
@@ -158,6 +163,11 @@ class LlamaServerClient(BaseLlamaClient):
                                         headers=self.extra_headers, stream=True)
             if resp.status_code in (429, 503):
                 raise LlamaServerError("llama-server is busy with another request. Try again in a moment.")
+            if self._invalidate_context_window_on_rejection(resp):
+                raise LlamaServerError(
+                    "llama-server rejected the request as too large. The cached context estimate "
+                    "was cleared; retry to rebuild the prompt, and reduce it if the error repeats."
+                )
             resp.raise_for_status()
         except requests.exceptions.ConnectionError as e:
             raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e

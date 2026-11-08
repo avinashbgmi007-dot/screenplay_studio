@@ -9,6 +9,7 @@ Each consumer subclasses BaseLlamaClient and adds its own chat method:
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
 import threading
@@ -18,12 +19,26 @@ import requests
 
 from .http_transport import RedirectRefusedError, request_no_redirects
 
-# The context window a server reports changes only when the server restarts, and
-# a client is constructed per web request — so the probe result is cached by
-# base_url rather than per client. None is cached too: a build without /props
-# must not be re-probed on every turn.
-_CONTEXT_WINDOW_CACHE: dict[str, int | None] = {}
+# Clients are request-scoped, so a short process cache avoids paying the /props
+# round trip on every chat turn. Entries are model/auth scoped and expire: a
+# server can be restarted or a model replaced without changing its URL.
+_CONTEXT_WINDOW_CACHE: dict[tuple[str, str, str], tuple[int | None, float]] = {}
 _CONTEXT_WINDOW_LOCK = threading.Lock()
+_CONTEXT_WINDOW_TTL_SECONDS = 60.0
+_CONTEXT_WINDOW_MISS_TTL_SECONDS = 10.0
+_CONTEXT_WINDOW_CACHE_MAXSIZE = 256
+
+_CONTEXT_WINDOW_REJECTION = re.compile(
+    r"(?:context.{0,80}(?:length|window|limit|size|exceed|overflow)|"
+    r"(?:maximum|max|too many).{0,80}(?:tokens|context)|"
+    r"(?:tokens|prompt).{0,80}(?:exceed|over limit|too long)|n_ctx)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _context_cache_now() -> float:
+    """Clock seam for deterministic expiry tests."""
+    return time.monotonic()
 
 
 class LlamaServerError(Exception):
@@ -144,26 +159,71 @@ class BaseLlamaClient:
         except LlamaServerError:
             return False
 
+    def _context_window_cache_key(self) -> tuple[str, str, str]:
+        """Partition capabilities without retaining credential values in keys."""
+        headers = tuple(sorted((str(key).lower(), str(value))
+                               for key, value in self.extra_headers.items()))
+        header_digest = hashlib.sha256(repr(headers).encode("utf-8")).hexdigest() if headers else ""
+        return self.base_url, self.model or "", header_digest
+
+    def invalidate_context_window(self) -> None:
+        """Forget this endpoint/auth context after a server rejection.
+
+        A model may have been resolved from a fallback after its initial probe,
+        so clear every model entry for this endpoint and header identity. A
+        redundant probe is safer than leaving another model alias stale.
+        """
+        key = self._context_window_cache_key()
+        with _CONTEXT_WINDOW_LOCK:
+            for cached_key in list(_CONTEXT_WINDOW_CACHE):
+                if cached_key[0] == key[0] and cached_key[2] == key[2]:
+                    _CONTEXT_WINDOW_CACHE.pop(cached_key, None)
+
+    def _invalidate_context_window_on_rejection(self, response) -> bool:
+        """Drop a stale estimate when the server explicitly rejects context size."""
+        status = getattr(response, "status_code", 200)
+        rejected = (status == 413 or (status == 400 and _CONTEXT_WINDOW_REJECTION.search(
+            getattr(response, "text", "") or "")))
+        if rejected:
+            self.invalidate_context_window()
+        return bool(rejected)
+
     def context_window(self) -> int | None:
         """The context window this server reports, in TOKENS — or None.
 
-        Exists so a caller can size its own prompt against the model it is
-        actually talking to instead of guessing a constant. The co-writer uses
-        it for its prompt budget: a model reporting a small window gets a small
-        budget (and the prompt sheds garnish rather than being silently
-        truncated), while a model with room is left alone.
+        Results are scoped to endpoint, selected model and a one-way digest of
+        request headers. Positive results expire after 60 seconds; unavailable
+        or unsupported probes expire after 10 seconds. This preserves reuse
+        across ordinary turns while bounding stale data after a restart or model
+        swap at the same URL. A recognized context-length rejection also clears
+        the entry so the next turn probes immediately.
 
         Best-effort by design. `/props` is a llama.cpp endpoint that some builds
         don't expose, and a capability probe must never fail a chat turn — so
         every failure path returns None and the caller falls back to a constant.
         """
-        key = self.base_url
+        key = self._context_window_cache_key()
+        now = _context_cache_now()
         with _CONTEXT_WINDOW_LOCK:
-            if key in _CONTEXT_WINDOW_CACHE:
-                return _CONTEXT_WINDOW_CACHE[key]
+            cached = _CONTEXT_WINDOW_CACHE.get(key)
+            if cached is not None:
+                value, expires_at = cached
+                if expires_at > now:
+                    return value
+                _CONTEXT_WINDOW_CACHE.pop(key, None)
+
         n_ctx = self._probe_context_window()
+        now = _context_cache_now()
+        ttl = _CONTEXT_WINDOW_TTL_SECONDS if n_ctx is not None else _CONTEXT_WINDOW_MISS_TTL_SECONDS
         with _CONTEXT_WINDOW_LOCK:
-            _CONTEXT_WINDOW_CACHE[key] = n_ctx
+            # Expiry is also the natural cleanup path for endpoints no longer in
+            # use. Bound memory if a process talks to many models/tenants.
+            for stale_key, (_value, expiry) in list(_CONTEXT_WINDOW_CACHE.items()):
+                if expiry <= now:
+                    _CONTEXT_WINDOW_CACHE.pop(stale_key, None)
+            if len(_CONTEXT_WINDOW_CACHE) >= _CONTEXT_WINDOW_CACHE_MAXSIZE:
+                _CONTEXT_WINDOW_CACHE.pop(next(iter(_CONTEXT_WINDOW_CACHE)))
+            _CONTEXT_WINDOW_CACHE[key] = (n_ctx, now + ttl)
         return n_ctx
 
     def _probe_context_window(self) -> int | None:
@@ -224,6 +284,11 @@ class BaseLlamaClient:
                     attempt += 1
                     time.sleep(busy_retry_delay(attempt))
                     continue
+                if self._invalidate_context_window_on_rejection(resp):
+                    raise LlamaServerError(
+                        "llama-server rejected the request as too large. The cached context estimate "
+                        "was cleared; retry to rebuild the prompt, and reduce it if the error repeats."
+                    )
                 resp.raise_for_status()
                 return resp.json()
             except requests.exceptions.ConnectionError as e:

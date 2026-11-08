@@ -4134,3 +4134,42 @@ archive-member failures were
 project, library and recovery file links; a directory link; and a symlinked
 project manifest;
 the separate root-symlink case failed under the root-containment revert.
+
+## §97 — Gap 36: context-window cache has no notion of time or model (review before implementation)
+
+**Finding:** `BaseLlamaClient.context_window()` stores `(implicitly) just a value` in the process-global `_CONTEXT_WINDOW_CACHE`, keyed only by `base_url`. It has no expiry or invalidation. A server restart/model replacement at the same endpoint can leave the old positive value indefinitely; an old `None` is also indefinite, so a server that later exposes `/props` stays on fallback sizing until process restart. Different explicit model IDs and different authorization contexts at the same endpoint also currently share one answer. The existing tests prove that cache reuse saves probes, but their autouse fixture clears the global cache on both sides and therefore does not test real cache aging or replacement.
+
+**Self-critique of the obvious fixes:**
+
+- Clearing on every client construction defeats the cache: webapp clients are request-scoped and prompt budgeting would pay a `/props` round trip (up to three seconds) on every turn.
+- Keying only by model ID fixes explicit model switches, not replacing a GGUF while keeping the same model alias, restarting llama.cpp at the same URL, or a gateway changing its backing model.
+- A long-lived TTL does not address the registered failure mode; a short TTL on every call causes avoidable probe latency. `None` needs a shorter retry window than a valid capability, or unsupported/offline builds either hammer `/props` or remain stale forever.
+- Automatically resending a chat after a context-length rejection could repeat a paid/slow generation or duplicate side effects. The safe response is to invalidate the cached estimate, return an explicit context-size error, and let the next turn probe with a fresh budget—not silently replay the writer's turn.
+
+**Recommended implementation to proceed with:** key entries by normalized base URL, explicit model ID, and a one-way digest of stable extra headers (so tokens are not retained in the cache key); expire successful probes after 60 seconds and `None` results after 10 seconds; cap/prune the process cache; expose per-client invalidation; and clear the entry on recognizable HTTP context-window rejection in the analyzer, co-writer sync, and co-writer streaming requests. Keep current best-effort behavior: the probe can fail without breaking a turn, and unsupported `/props` uses the configured fallback. Tests should use synthetic clients/responses to cover same-URL model changes, same-model replacement after TTL, negative-cache expiry, auth-context separation, context-rejection invalidation, and cache reuse within TTL. No live model/server or external data is needed.
+
+**Limits to keep explicit:** TTL bounds staleness, it cannot identify a server generation the endpoint does not expose; immediately after a same-alias restart, the first request can still use the cached value until expiry or a context-rejection response. The existing HTTP error remains visible for that request. Probe latency, per-process rather than distributed caching, and gateways that change backing models without changing model ID remain trade-offs. No claims about a real user's server are justified by fake responses.
+
+**Implementation/self-review result for §97:** the recommended bounded cache is
+now in place. Stable header values are represented only by a SHA-256 digest in
+the key. A valid window lives 60 seconds; a failed/unsupported probe lives 10;
+expired entries are pruned and the cache is capped at 256 entries. A recognizable
+400 context-size error or 413 clears all model entries for that endpoint/header
+identity (important because co-writer fallback can mutate the model after the
+probe). Analyzer, co-writer synchronous, and co-writer SSE paths each return an
+explicit “cached context estimate was cleared; retry to rebuild the prompt”
+error rather than replaying the turn.
+
+The new synthetic tests pin same-alias refresh after 60 seconds, the shorter
+negative TTL, model and authorization isolation, cache bounds, fallback-alias
+invalidation, and all three rejection paths. Independent reverts caused the
+expected regressions: no positive TTL **1 failed**; no model key **1**; no auth
+key **1**; indefinite negative cache **1**; no rejection invalidation **3**;
+no cache cap **1**; and exact-key-only invalidation after fallback **1**.
+Reverts: 1 / 1 / 1 / 1 / 3 / 1 / 1.
+
+**Validation for gap 36:** `tools/gap_harness/close_gap.py check 36` passed all
+checks, including **9 focused cache-refresh tests**, Ruff clean, and the full suite
+(**3159 passed, 8 skipped, 2 warnings**). All seven independent reverts above
+produced nonzero expected failures. The behavior is proven with fake responses
+and a fake clock only; no model server was contacted.
