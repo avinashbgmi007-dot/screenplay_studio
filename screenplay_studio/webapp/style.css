@@ -6569,3 +6569,6 @@ body:not(.idea-mode) .desk {
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
+
+/* Project-scoped consent has no meaning in the separate idea room. */
+body.idea-mode #shelf-sharing-btn { display: none; }

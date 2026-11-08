@@ -112,3 +112,28 @@ def library_digest_text(library: list[dict], limit: int = 6) -> str:
         )
     lines.append(LIBRARY_GROUNDING_GUARD)
     return "\n".join(lines)
+
+
+# ---------- gap 31: consent before another script's details enter a prompt ----------
+
+def shelf_context_allowed(shared_opt_in: bool = False,
+                          model_is_local: bool = False) -> bool:
+    """Only an explicit project opt-in allows another script into a prompt.
+
+    Locality is deliberately NOT consent: a local model may retain context, the
+    writer may not want scripts mixed, and the writer owns the decision either
+    way. `model_is_local` remains in the signature for callers that want to
+    tailor the disclosure, not to bypass this boundary.
+    """
+    del model_is_local  # destination changes disclosure, never the consent rule
+    return bool(shared_opt_in)
+
+
+def shelf_disclosure_text() -> str:
+    """What the writer is agreeing to, in the desk's words."""
+    return (
+        "Other scripts on your shelf: sending them means this project's chat "
+        "prompt carries the titles, character names and theme notes of your "
+        "OTHER scripts. A local model keeps that on your machine; a remote one "
+        "sends it off it. Left off, the co-writer sees only this script."
+    )

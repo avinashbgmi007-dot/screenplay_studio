@@ -209,6 +209,13 @@ class ProjectManifest:
     cowriter_session_id: str = None
     drafts: list = field(default_factory=list)  # [{name, source_filename, uploaded_at}] — uploaded drafts
     active_draft: str = None  # None => the original first upload is active
+    # Gap 31: may this project's chat prompt carry details of the writer's OTHER
+    # scripts (titles, character names, theme notes)? Default NO. The model may
+    # be remote, and a shelf digest is somebody else's screenplay summarised; a
+    # prompt instruction not to mix projects is not a privacy boundary. Opt-in,
+    # per project, recorded on the manifest so it survives restarts and is
+    # visible rather than implied.
+    share_shelf_context: bool = False
     report_language: str = "eng"  # language of the analysis report: eng | tenglish | hindi | telugu | tamil
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
@@ -375,6 +382,7 @@ class ProjectManifest:
             "cowriter_session_id": self.cowriter_session_id,
             "drafts": self.drafts,
             "active_draft": self.active_draft,
+            "share_shelf_context": bool(self.share_shelf_context),
             "report_language": self.report_language,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -393,6 +401,7 @@ class ProjectManifest:
             cowriter_session_id=d.get("cowriter_session_id"),
             drafts=d.get("drafts", []),
             active_draft=d.get("active_draft"),
+            share_shelf_context=bool(d.get("share_shelf_context", False)),
             report_language=d.get("report_language", "eng"),
             created_at=d.get("created_at", time.time()),
             updated_at=d.get("updated_at", time.time()),
@@ -450,6 +459,7 @@ class ProjectManifest:
         self._baseline = copy.deepcopy(out)
         self.drafts = out.get("drafts") or []
         self.active_draft = out.get("active_draft")
+        self.share_shelf_context = bool(out.get("share_shelf_context", False))
 
     @staticmethod
     def load(project_dir: str) -> "ProjectManifest":

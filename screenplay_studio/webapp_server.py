@@ -1576,6 +1576,7 @@ def _manifest_summary(m: ProjectManifest) -> dict:
         "edit_count": len(edits_log(m)),
         "drafts": m.drafts,
         "active_draft": m.active_draft,
+        "share_shelf_context": bool(getattr(m, "share_shelf_context", False)),
         "report_language": m.report_language,
         # Gap 73: which file the pages actually came from, and what else in the
         # folder looks like a script but is not part of this draft. The export
@@ -2335,6 +2336,25 @@ def get_project(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     data = _manifest_summary(m)
+    # Gap 31: explicit, local preview of exactly what the cross-project shelf
+    # digest can add to a prompt. This is returned only on request; it is not
+    # sent to a model, and lets the writer see the actual titles/cast/themes
+    # before opting in rather than consenting to vague categories.
+    if request.args.get("shelf_preview") == "1":
+        try:
+            lib_mod = _import_cowriter("writer_library")
+            entries = lib_mod.build_library(PROJECTS_DIR, exclude=name, limit=6)
+            data["shelf_preview"] = [
+                {"title": e.get("title") or e.get("project") or "Untitled",
+                 "characters": e.get("characters") or [],
+                 "themes": e.get("themes") or [],
+                 "unreadable": bool(e.get("unreadable"))}
+                for e in entries
+            ]
+        except Exception:
+            # Preview failure is not permission: the UI can explain that it
+            # could not inspect the shelf, but must not silently opt in.
+            data["shelf_preview_error"] = True
     # An idea that graduated carries its premise card alongside the pages.
     # Missing is a legitimate empty; UNREADABLE is damage and says so (A3).
     card, perr = _load_premise(m.project_dir)
@@ -2343,6 +2363,24 @@ def get_project(name):
     if perr:
         data["premise_error"] = perr
     return jsonify(data)
+
+
+@app.route("/api/projects/<name>/shelf-sharing", methods=["POST"])
+def set_project_shelf_sharing(name):
+    """Explicit, per-project consent for other scripts' details in chat prompts."""
+    if not request.is_json:
+        return _error("Expected a JSON object.", 400)
+    body = request.get_json(silent=True) or {}
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        return _error("enabled must be true or false.", 400)
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    m.share_shelf_context = enabled
+    m.save()
+    return jsonify({"share_shelf_context": bool(m.share_shelf_context)})
 
 
 @app.route("/api/projects/<name>", methods=["DELETE"])
@@ -5822,6 +5860,39 @@ def _build_library(lib_mod, exclude: str | None) -> list[dict]:
         return []
 
 
+def _shelf_context_allowed(project_name) -> bool:
+    """May this project's chat prompt carry details of the writer's OTHER
+    scripts (gap 31)?
+
+    Decided by one predicate, so the library block and the doctor case file can
+    never disagree — two blocks disagreeing is how one of them ends up being the
+    leak. Local model => yes (nothing leaves the machine, the same promise the
+    desk already makes about the script itself). Remote model => only after the
+    writer turns it on for this project.
+    """
+    try:
+        from screenplay_cowriter.writer_library import shelf_context_allowed
+    except Exception:
+        return False
+    shared = False
+    try:
+        if project_name:
+            m = _load_manifest(project_name)
+            shared = bool(getattr(m, "share_shelf_context", False))
+    except Exception:
+        # An unreadable manifest is not consent. Default-deny.
+        shared = False
+    try:
+        from .net_guard import is_loopback_url
+        url = CONFIG.get("server_url") or ""
+        local = bool(url) and is_loopback_url(url)
+    except Exception:
+        # Cannot tell where the model is => treat it as remote. Guessing
+        # "local" here would send another writer's script to an unknown host.
+        local = False
+    return shelf_context_allowed(shared, local)
+
+
 def _shelf_providers(exclude: str | None):
     """The two deferred shelf blocks for one request, as zero-arg providers.
 
@@ -5837,7 +5908,17 @@ def _shelf_providers(exclude: str | None):
             box["fp"] = _shelf_fingerprint(exclude)
         return box["fp"]
 
+    # Gap 31: BOTH shelf blocks are cross-project by construction — the library
+    # lists other scripts' titles, casts and theme notes; the doctor case file is
+    # an aggregate of this writer's other scripts. Neither may be built for a
+    # prompt until the writer has agreed, or the model is local. Returning None
+    # here is the boundary: a digest that is never built cannot be "shed under
+    # prompt pressure" into a prompt, which was the filed behaviour.
     def library_text():
+        # Re-read at prompt-build time, not when the session loaded: turning
+        # sharing off must take effect on the very next turn of an open chat.
+        if not _shelf_context_allowed(exclude):
+            return None
         try:
             lib_mod = _import_cowriter("writer_library")
         except CowriterUnavailableError:
@@ -5847,6 +5928,8 @@ def _shelf_providers(exclude: str | None):
         return lib_mod.library_digest_text(library) or None
 
     def case_file_text():
+        if not _shelf_context_allowed(exclude):
+            return None
         return _cached_shelf_digest("case_file", fingerprint(),
                                     lambda: _build_doctor_case_file(exclude))
 

@@ -3941,3 +3941,48 @@ because every test in that file exercised `clean_reply`, not the caller. The new
 `_generate_mirrored` tests fixed that. This is the second time in three gaps that
 reverting found a test certifying nothing (§91 had two). Reverting is not
 ceremony; it is the only check that the tests are load-bearing.
+
+## §93 — Gap 31: a prompt instruction is not consent (2026-11-02)
+
+**Reverts: 3 / 1 / 1 / 1 / 1.** 21 tests in `tests/test_other_projects_need_consent_to_enter_a_prompt.py`.
+
+The original defect is reproduced by the test that matters: a synthetic shelf,
+the real library provider, the real chat engine, and a fake model capturing the
+actual assembled system prompt. With no consent, the other project's title and
+character name are absent. After explicit consent, both are there. The doctor's
+aggregate uses the same gate. The preview path shows the specific projects,
+characters and themes locally before the writer agrees to those details being
+placed in a prompt.
+
+**Three self-corrections while fixing this:**
+
+1. My first policy treated a local model as consent because the digest stayed on
+the machine. That was too permissive: local processing is not what the writer
+consents to, and the writer may not want scripts mixed even locally. Consent is
+now required for every model destination; locality changes neither the default
+nor the gate.
+2. I initially checked consent when the session loaded. That would have made
+revocation cosmetic until the session was reloaded. Deferred providers now read
+the project manifest at prompt-build time; revoke while the chat is open, and the
+next turn does not build either cross-project block.
+3. The entry says "preview its scope". A vague statement that titles and cast
+*may* be sent would technically disclose categories, not the particular scope.
+The UI fetches and displays the actual titles, character names and themes before
+showing the confirmation. The preview is a local UI response, not a model call.
+
+**Boundary distinction kept:** the app already refuses remote model URLs unless
+the writer starts it with `--allow-remote-server`; the per-project shelf consent
+is a separate boundary. Having one does not stand in for the other. This change
+does not establish that an external transmission happened.
+
+**Not yet proven:** the browser confirmation is covered by the existing UI's
+normal click plumbing and the server route is exercised through Flask tests, but
+there is no browser-level test asserting the exact confirmation text or its
+interaction on a real rendered page. The server-side prompt boundary is covered
+end to end. Revert each gate independently before marking the fix closed.
+
+Reverts: 3 / 1 / 1 / 1 / 1 (remove the provider gate / cache consent at session
+load / default the manifest to on / omit the actual-scope preview / skip saving
+the writer's choice). Each revert made its corresponding regression test fail.
+The full system-prompt test also fails if the provider gate is removed: it
+captures the assembled prompt, not merely the digest callback.

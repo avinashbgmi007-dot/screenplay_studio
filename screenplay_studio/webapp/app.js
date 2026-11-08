@@ -2702,6 +2702,14 @@ async function openProject(name) {
     toggleSidebar(true, false);
     $("#project-bar").style.display = "flex";
     $("#project-title").textContent = project.title;
+    const shelfSharing = $("#shelf-sharing-btn");
+    if (shelfSharing) {
+      shelfSharing.textContent = project.share_shelf_context ? "Other scripts: on" : "Other scripts: off";
+      shelfSharing.setAttribute("aria-pressed", project.share_shelf_context ? "true" : "false");
+      shelfSharing.title = project.share_shelf_context
+        ? "Other projects' titles, character names and theme notes may be added to this project's chat prompt. Click to turn off."
+        : "Other projects stay out of this chat unless you explicitly allow them.";
+    }
     $("#project-title").title = project.title;
     renderSourceProvenance(project);
 
@@ -10832,6 +10840,55 @@ function init() {
   // selectors
   $("#persona-select").addEventListener("change", updateSettings);
   $("#mode-select").addEventListener("change", updateSettings);
+
+  // Cross-project prompt context is per-project and default-off. The disclosure
+  // is shown before the writer enables it; the server is the actual gate.
+  $("#shelf-sharing-btn").addEventListener("click", async () => {
+    if (!state.currentProject || state.inIdea) return;
+    const button = $("#shelf-sharing-btn");
+    const currentlyOn = button.getAttribute("aria-pressed") === "true";
+    if (currentlyOn) {
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/shelf-sharing`, {
+          method: "POST", body: JSON.stringify({ enabled: false }),
+        });
+        button.textContent = "Other scripts: off";
+        button.setAttribute("aria-pressed", "false");
+        button.title = "Other projects stay out of this chat unless you explicitly allow them.";
+      } catch (e) { showError("Couldn't update shelf sharing: " + e.message); }
+      return;
+    }
+    let preview;
+    try {
+      preview = await api(`/projects/${encodeURIComponent(state.currentProject)}?shelf_preview=1`);
+    } catch (e) { showError("Couldn't preview the other scripts: " + e.message); return; }
+    if (preview.shelf_preview_error) {
+      showError("Couldn't inspect the shelf, so sharing was not enabled.");
+      return;
+    }
+    const entries = preview.shelf_preview || [];
+    const scope = entries.length ? entries.map((item) => {
+      const details = [item.characters?.length ? `characters: ${item.characters.join(", ")}` : "",
+        item.themes?.length ? `themes: ${item.themes.join("; ")}` : "",
+        item.unreadable ? "file unreadable" : ""].filter(Boolean).join(" · ");
+      return `• ${item.title}${details ? ` — ${details}` : ""}`;
+    }).join("\n") : "• No parsed other projects right now (future parsed projects will also be included).";
+    const disclosure = "Allow these other scripts into this project's chat prompt?\n\n" +
+      scope + "\n\n" +
+      "Their titles, character names, and theme notes will be added to this project's " +
+      "co-writer prompt and may be sent to the model you configured. This is a " +
+      "per-project choice; future parsed projects will be included too. You can turn " +
+      "it off at any time.\n\nNothing is shared unless you choose OK.";
+    if (!window.confirm(disclosure)) return;
+    try {
+      await api(`/projects/${encodeURIComponent(state.currentProject)}/shelf-sharing`, {
+        method: "POST", body: JSON.stringify({ enabled: true }),
+      });
+      button.textContent = "Other scripts: on";
+      button.setAttribute("aria-pressed", "true");
+      button.title = "Other projects' titles, character names and theme notes may be added to this project's chat prompt. Click to turn off.";
+    } catch (e) { showError("Couldn't update shelf sharing: " + e.message); }
+  });
 
   // settings modal
   $("#settings-btn").addEventListener("click", () => {

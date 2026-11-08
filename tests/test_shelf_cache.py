@@ -279,6 +279,11 @@ class TestNonGeneratingRequestsDoNoShelfWork:
         # the engine loads the parsed document; the manifest only records where
         # it lives, so the parse has to exist for the real code path to run
         _write_project(shelf, "Alpha", title="Alpha")
+        # These tests exercise the cost/defer mechanics of a permitted shelf;
+        # consent itself is covered in test_other_projects_need_consent_to_enter_a_prompt.
+        manifest = ProjectManifest.load(str(project_dir))
+        manifest.share_shelf_context = True
+        manifest.save()
         session = SessionStore(str(project_dir / "sessions")).create("a chat")
         return "Alpha", session.session_id
 
