@@ -61,3 +61,46 @@ class TestAnEmptiedReplyIsNeverStoredAsBlank:
         # The documented contract, unchanged — this is why the fix belongs in the
         # caller rather than in the filter.
         assert strip_language_meta("This reads as a South Indian language.") == ""
+
+
+class TestTheEngineNeverHandsBackABlankReply:
+    """The caller-side half, driven through the real method.
+
+    The filter emptying a wholly-meta reply is correct and unchanged. What was
+    wrong is that the engine passed that "" straight out, so the session stored
+    an empty assistant message and the writer saw a blank bubble. A revert that
+    removed the recovery left every other test in this file green -- the filter
+    tests cannot see the caller -- so this drives `_generate_mirrored` itself.
+    """
+
+    def _engine(self, raw):
+        from screenplay_cowriter.engine import CoWriterEngine
+
+        class _E(CoWriterEngine):
+            def __init__(self):        # no client, no script, no report
+                pass
+
+            def _generate(self, messages, on_token=None):
+                return raw
+
+        return _E()
+
+    def test_an_emptied_reply_is_recovered_rather_than_returned_blank(self):
+        e = self._engine("This reads as a South Indian language.")
+        out = e._generate_mirrored([{"role": "user", "content": "Is scene 3 slow?"}],
+                                   "Is scene 3 slow?")
+        assert out.strip(), "the engine handed back a blank reply"
+        assert "South Indian" in out, (
+            "the recovery dropped the model's actual text instead of keeping it")
+
+    def test_the_recovery_says_what_happened(self):
+        e = self._engine("This reads as a South Indian language.")
+        out = e._generate_mirrored([{"role": "user", "content": "x"}], "x")
+        assert "subtitles" in out.lower(), (
+            "the writer gets their text back with no explanation for the "
+            "appended sentence")
+
+    def test_a_normal_reply_is_returned_unchanged(self):
+        e = self._engine("Scene 3 is doing too much work for its length.")
+        out = e._generate_mirrored([{"role": "user", "content": "x"}], "x")
+        assert out == "Scene 3 is doing too much work for its length."

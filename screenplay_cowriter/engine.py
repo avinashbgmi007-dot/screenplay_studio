@@ -310,7 +310,7 @@ class CoWriterEngine:
             # assistant message -- indistinguishable from a crash, and the writer
             # was shown a blank bubble instead of the answer the model gave.
             # Cleaning may reduce a reply; it may not erase it.
-            from .language_mirror import language_filter_notice
+            from .language_meta import language_filter_notice
             reply = (raw.strip() + "\n\n" + language_filter_notice())
         if register_mismatch(user_text, reply) is None:
             return reply

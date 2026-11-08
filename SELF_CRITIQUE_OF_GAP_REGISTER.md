@@ -3900,3 +3900,44 @@ the suite stayed green, because every assertion read the object the parser had
 just returned. Both now drive the real function against fakes that record what
 happens. A test that cannot fail is worse than no test: it certifies nothing and
 buys silence.
+
+## §92 — Gaps 28 and 29: the crash before the model, and the answer the filter ate (2026-11-08)
+
+**Reverts: 9 / 2 / 2 / 1 / 1.** 22 tests across two files.
+
+**Gap 28 is the cheapest kind of real bug:** `max()` over a filtered generator
+with no guard. "Hi", "Yes", "ok", "?" and any Telugu utterance each raised before
+a model was called — and a one-word affirmation is not an edge case, it is most
+of what a writer types. The fix filters the candidate list first and falls
+through to the next name, which is the honest outcome: an unmatched character is
+a legitimate answer, and an invented match would be worse than a crash.
+
+**Gap 29 had two faults, and the second is why nobody saw the first.**
+
+1. The filter removed the answer to a direct question about its own subject. It
+   had no idea what was asked, so "Should I use subtitles?" got the same treatment
+   as unsolicited commentary. It now takes the user's turn and keeps the answer
+   when the writer asked.
+2. **The engine stored `""` as an assistant message.** A blank bubble is
+   indistinguishable from a crash, and the writer is told nothing. That is the
+   part that turned a filter decision into a silent failure.
+
+My first fix was to make `strip_language_meta` never return empty. **A
+pre-existing test refused it, and the test was right:** the function's documented
+contract is that a wholly-meta reply cleans to empty, and callers rely on it. I
+reverted that and fixed the caller. The rule I nearly broke: *when a contract is
+pinned by an existing test, the bug is usually where the contract is USED, not
+where it is defined.*
+
+**Found while fixing it, and it is the same defect wearing plain clothes:** "The
+dialogue reads as Telugu." — the simplest possible statement of the exact thing
+this filter exists to remove — passed through untouched, because the pattern
+required a qualifier after "reads as" ("reads as **regional**..."). Naming a
+language IS the identification.
+
+**One of my tests could not fail.** Reverts R1–R5 were built to prove each
+assertion; R3 (the engine's blank-recovery) passed with the recovery removed,
+because every test in that file exercised `clean_reply`, not the caller. The new
+`_generate_mirrored` tests fixed that. This is the second time in three gaps that
+reverting found a test certifying nothing (§91 had two). Reverting is not
+ceremony; it is the only check that the tests are load-bearing.
