@@ -46,6 +46,7 @@ import stat
 import time
 import uuid
 
+from .jsonio import claim_project_dir, safe_dir_name
 from .manifest import ProjectManifest
 from .orchestrator import Orchestrator
 
@@ -55,12 +56,6 @@ READY_SUFFIX = ".ready"
 
 def _is_supported(name: str) -> bool:
     return os.path.splitext(name)[1].lower() in SUPPORTED_EXTENSIONS and not name.startswith(".")
-
-
-def _safe_project_name(filename: str) -> str:
-    stem = os.path.splitext(filename)[0]
-    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in stem) or "project"
-    return safe
 
 
 CLAIM_DIR = ".processing"
@@ -256,17 +251,18 @@ def process_pending(watch_dir: str, projects_dir: str, server_url: str,
 
         result = {"filename": name, "ok": False, "pending": False,
                   "project": None, "error": None, "filed": None}
-        project_dir = os.path.join(projects_dir, _safe_project_name(name))
-        suffix = 1
-        while os.path.exists(project_dir):
-            suffix += 1
-            project_dir = os.path.join(projects_dir, f"{_safe_project_name(name)}_{suffix}")
-
+        display_title = os.path.splitext(name)[0]
+        safe_base = safe_dir_name(display_title)
+        project_id = None
+        project_dir = None
         created_project = False
         source_before = None
         try:
+            # A shared safe ASCII ID is distinct from the preserved title and
+            # source filename. mkdir is the atomic claim across web and watch.
+            project_id, project_dir = claim_project_dir(projects_dir, safe_base)
             source_before = _source_fingerprint(claimed)
-            manifest = ProjectManifest.create(project_dir, claimed, title=_safe_project_name(name))
+            manifest = ProjectManifest.create(project_dir, claimed, title=display_title)
             created_project = True
             manifest.server_url = server_url
             manifest.model_id = model
@@ -276,13 +272,13 @@ def process_pending(watch_dir: str, projects_dir: str, server_url: str,
             orch.run_parse()
             orch.run_analyze(categories=categories, report_language=report_language)
             result["ok"] = True
-            result["project"] = os.path.basename(project_dir)
+            result["project"] = project_id
         except Exception as e:      # noqa: BLE001 — one bad drop must not stop the batch
             result["error"] = str(e)
             # A project directory that never became usable is a phantom on the
             # shelf, not a copy the writer can open. The source is still in our
             # claim, so removing the partial copy loses nothing.
-            if not created_project:
+            if project_dir is not None and not created_project:
                 shutil.rmtree(project_dir, ignore_errors=True)
 
         # Check even after parse/analyze errors: changed input is never kept as a

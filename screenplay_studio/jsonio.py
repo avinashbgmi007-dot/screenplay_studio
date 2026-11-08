@@ -22,6 +22,7 @@ newcomer lock a fresh inode while an existing holder still owns the old one.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import threading
@@ -633,3 +634,29 @@ def suffixed_id(base: str, suffix: int, max_len: int = 64) -> str:
         return base[:max_len]
     tail = f"_{suffix}"
     return base[: max_len - len(tail)] + tail
+
+
+def claim_project_dir(parent: str, base: str, max_attempts: int = 1000) -> tuple[str, str]:
+    """Atomically claim a unique safe project ID below `parent`.
+
+    Returns `(project_id, project_dir)`. Every generated project path uses this
+    collision contract: the first claimant gets `base`, later claimants get a
+    bounded numeric suffix. `mkdir` is the test-and-set, so concurrent writers
+    cannot share a project directory.
+    """
+    check_safe_id(base, "project name")
+    os.makedirs(parent, exist_ok=True)
+    for suffix in range(1, max_attempts + 1):
+        project_id = suffixed_id(base, suffix)
+        try:
+            os.mkdir(os.path.join(parent, project_id))
+        except FileExistsError:
+            continue
+        return project_id, os.path.join(parent, project_id)
+    raise RuntimeError(f"could not find a free project directory for {base!r}")
+
+
+def legacy_project_id(directory_name: str) -> str:
+    """Return a deterministic safe route ID for a legacy unsafe folder name."""
+    digest = hashlib.sha256(directory_name.encode("utf-8", "surrogatepass")).hexdigest()
+    return "legacy_" + digest[:56]

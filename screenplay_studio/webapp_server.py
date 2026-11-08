@@ -37,10 +37,9 @@ from flask import Flask, Response, request, jsonify, send_from_directory, send_f
 from werkzeug.exceptions import HTTPException
 
 from .jsonio import (StoreLockTimeout, StoreUnreadable, atomic_write_json,
-                     check_safe_id, lock_for, retry_permission, safe_dir_name,
-                     suffixed_id,
-    damage_envelope, last_known_facts,
-)
+                     check_safe_id, claim_project_dir, legacy_project_id,
+                     lock_for, retry_permission, safe_dir_name, suffixed_id,
+                     damage_envelope, last_known_facts)
 
 from .ideas import IdeaStore
 from .logsetup import configure as _configure_logging
@@ -1240,35 +1239,62 @@ def static_files(filename):
 
 # ---------- helpers ----------
 
+def _legacy_project_id_map() -> dict[str, str]:
+    """Map safe public IDs to old unsafe project directory names, no migration."""
+    if not os.path.isdir(PROJECTS_DIR):
+        return {}
+    entries = sorted(os.listdir(PROJECTS_DIR))
+    occupied = set()
+    legacy_names = []
+    for actual in entries:
+        path = os.path.join(PROJECTS_DIR, actual)
+        try:
+            check_safe_id(actual, "project name")
+        except ValueError:
+            if (os.path.isdir(path) and not os.path.islink(path)
+                    and os.path.lexists(os.path.join(path, "project.json"))):
+                legacy_names.append(actual)
+        else:
+            # Any existing filesystem entry owns its literal ID; a legacy
+            # mapping must not shadow a file or directory with that name.
+            occupied.add(actual)
+    mapping = {}
+    for actual in legacy_names:
+        base = legacy_project_id(actual)
+        candidate = base
+        suffix = 2
+        while candidate in occupied:
+            candidate = suffixed_id(base, suffix)
+            suffix += 1
+        occupied.add(candidate)
+        mapping[candidate] = actual
+    return mapping
+
+
 def _project_dir(name: str) -> str:
     check_safe_id(name, "project name")
-    return os.path.join(PROJECTS_DIR, name)
+    direct = os.path.join(PROJECTS_DIR, name)
+    if os.path.lexists(direct):
+        return direct
+    legacy_name = _legacy_project_id_map().get(name)
+    return os.path.join(PROJECTS_DIR, legacy_name or name)
+
+
+def _public_project_id(project_dir: str) -> str:
+    actual = os.path.basename(os.path.normpath(project_dir))
+    try:
+        return check_safe_id(actual, "project name")
+    except ValueError:
+        pass
+    reverse = {directory: project_id
+               for project_id, directory in _legacy_project_id_map().items()}
+    return reverse.get(actual, legacy_project_id(actual))
 
 
 def _claim_project_dir(base: str) -> str:
-    """Atomically claim a fresh project directory derived from `base`.
-
-    `os.makedirs` IS the test-and-set here. The previous shape —
-    `while os.path.exists(d): d = next(...)` followed by
-    `os.makedirs(d, exist_ok=True)` — let two concurrent creates with the same
-    title both pass the existence check, both pick the same suffix, and then
-    BOTH succeed on `exist_ok=True` into one directory, interleaving two
-    uploads inside a single project (L5). Losing the mkdir race is now the
-    signal to try the next suffix, so the claim is atomic.
-
-    The suffix goes through `suffixed_id` because a base that already fills the
-    64-char id contract cannot take a "_2" appended: the name became 66 chars
-    and `check_safe_id` rejected it, so creating the SAME title twice 500'd on
-    the second create (L4).
-    """
-    for suffix in range(1, 1001):
-        name = suffixed_id(base, suffix)
-        try:
-            os.makedirs(_project_dir(name))
-        except FileExistsError:
-            continue
-        return _project_dir(name)
-    raise RuntimeError(f"could not find a free project directory for {base!r}")
+    """Shared atomic safe-ID claim used by web and watch-generated projects."""
+    _, project_dir = claim_project_dir(PROJECTS_DIR, base)
+    return project_dir
 
 
 def _load_manifest(name: str) -> ProjectManifest:
@@ -1619,7 +1645,7 @@ def _unsupported_ext_error(filename: str):
         + ", ".join(sorted(SUPPORTED_UPLOAD_EXTS)) + ".", 400)
 
 
-def _manifest_summary(m: ProjectManifest) -> dict:
+def _manifest_summary(m: ProjectManifest, project_id: str = None) -> dict:
     sessions = []
     if os.path.isdir(m.sessions_dir):
         try:
@@ -1630,7 +1656,7 @@ def _manifest_summary(m: ProjectManifest) -> dict:
             sessions = []  # co-writer not installed — shelf still works
     from .revision import has_edits, edits_log
     return {
-        "project": os.path.basename(m.project_dir),
+        "project": project_id or _public_project_id(m.project_dir),
         "title": m.title,
         "server_url": m.server_url,
         "model_id": m.model_id,
@@ -2189,6 +2215,8 @@ def list_projects():
     if not os.path.isdir(PROJECTS_DIR):
         return jsonify([])
     out = []
+    legacy_ids = _legacy_project_id_map()
+    legacy_public_ids = {actual: public for public, actual in legacy_ids.items()}
     for name in sorted(os.listdir(PROJECTS_DIR)):
         # writer_profile.json is the co-writer's relationship-memory store —
         # internal data, not a project. It must never appear as a shelf card.
@@ -2196,17 +2224,21 @@ def list_projects():
             continue
         # jsonio drops a `<store>.lock` sidecar beside every store it writes, and
         # one of those (writer_profile.json.lock) lands in this very directory.
-        # A lock file is a FILE, not a project: without this it reached
-        # _project_dir -> check_safe_id, which rejects the '.' in the name, and
-        # the `except Exception` below then rendered it as a phantom
-        # "unreadable" project on the writer's shelf.
         if not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
             continue
         try:
-            m = ProjectManifest.load(_project_dir(name))
-            out.append(_manifest_summary(m))
+            check_safe_id(name, "project name")
+            public_id = name
+        except ValueError:
+            public_id = legacy_public_ids.get(name)
+            if public_id is None:
+                continue  # not a recognized legacy project directory
+        pdir = os.path.join(PROJECTS_DIR, name)
+        try:
+            m = ProjectManifest.load(pdir)
+            out.append(_manifest_summary(m, public_id))
         except FileNotFoundError:
-            continue  # not a project (stray file / the ideas store)
+            continue  # not a project (stray directory / the ideas store)
         except Exception as e:
             # Flag, don't drop: a damaged manifest stays visible on the shelf
             # so the writer knows it exists and can remove it. Empty stage
@@ -2216,18 +2248,17 @@ def list_projects():
             # damaged idea carries — with the project's own card fields alongside.
             # `recoverable` is what /recover would actually find: a source file or
             # the raw manifest, both of which gap 80 made reachable.
-            pdir = _project_dir(name)
             try:
                 _src = _recovered_source_file(pdir)
             except Exception:
                 _src = None
             out.append(damage_envelope(
-                "project", name,
+                "project", public_id,
                 detail=f"{type(e).__name__}: {e}",
                 recoverable=bool(_src) or os.path.exists(
                     os.path.join(pdir, "project.json")),
                 last_known=last_known_facts(os.path.join(pdir, "project.json")),
-                project=name,
+                project=public_id,
                 stages={"parse": {}, "analyze": {}, "chat": {}},
                 sessions=[],
             ))
@@ -2408,7 +2439,8 @@ def get_project(name):
     if request.args.get("shelf_preview") == "1":
         try:
             lib_mod = _import_cowriter("writer_library")
-            entries = lib_mod.build_library(PROJECTS_DIR, exclude=name, limit=6)
+            entries = lib_mod.build_library(
+                PROJECTS_DIR, exclude=os.path.basename(m.project_dir), limit=6)
             data["shelf_preview"] = [
                 {"title": e.get("title") or e.get("project") or "Untitled",
                  "characters": e.get("characters") or [],
@@ -2856,7 +2888,7 @@ def _retry_failed_locked(m):
     # `/analyze/cancel` answered "No analysis is running" (409) while a retry
     # was genuinely in flight — and even a registered event would have been
     # ignored, because the pipeline was never asked to look at it.
-    name = os.path.basename(m.project_dir)
+    name = _public_project_id(m.project_dir)
     cancel_event = _ANALYZE_CANCEL.setdefault(name, threading.Event())
     try:
         orch.run_analyze(retry_failed=True, should_cancel=cancel_event.is_set)
@@ -3859,7 +3891,7 @@ def export_script(name):
     # because the artifact is what leaves the machine.
     parse_stage = m.stage("parse")
     text = export(doc, fmt, provenance={
-        "project": os.path.basename(m.project_dir),
+        "project": _public_project_id(m.project_dir),
         "project_source_file": m.source_filename or None,
         "parsed_at": parse_stage.updated_at if parse_stage.status == "complete" else None,
     })
