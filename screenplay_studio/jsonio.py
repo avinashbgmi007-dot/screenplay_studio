@@ -53,14 +53,15 @@ _LOCK_POLL_SECONDS = 0.01
 
 
 class StoreLockTimeout(RuntimeError):
-    """Another process held a store lock for longer than LOCK_TIMEOUT_SECONDS."""
+    """A thread or process held a store lock beyond its wait budget."""
 
-    def __init__(self, path: str, timeout: float):
+    def __init__(self, path: str, timeout: float, wait_for: str = "another process"):
         self.path = path
         self.timeout = timeout
-        secs = f"{timeout:.1f}".rstrip("0").rstrip(".")
+        self.wait_for = wait_for
+        secs = f"{timeout:.3f}".rstrip("0").rstrip(".")
         super().__init__(
-            f"timed out after {secs}s waiting for another process to "
+            f"timed out after {secs}s waiting for {wait_for} to "
             f"release {os.path.basename(path)}")
 
 
@@ -118,26 +119,36 @@ def _lock_file_path(path: str) -> str:
     return path + ".lock"
 
 
-def _acquire_os_lock(fd: int, path: str, timeout: float | None = None) -> None:
+def _effective_lock_deadline(started: float, timeout: float | None = None,
+                             deadline: float | None = None) -> float:
+    """Intersect a per-acquisition budget with its caller's shared deadline."""
+    if timeout is None:
+        timeout = LOCK_TIMEOUT_SECONDS
+    expires_at = started + timeout
+    if deadline is not None:
+        expires_at = min(expires_at, deadline)
+    stack = getattr(_deadline_local, "stack", None)
+    if stack:
+        expires_at = min(expires_at, stack[-1])
+    return expires_at
+
+
+def _acquire_os_lock(fd: int, path: str, timeout: float | None = None,
+                     deadline: float | None = None) -> None:
     """Take the exclusive byte-range lock on `fd`, waiting up to `timeout`.
 
     `timeout` defaults to LOCK_TIMEOUT_SECONDS, read at CALL time so the bound
-    stays patchable (a default argument would freeze it at import).
+    stays patchable (a default argument would freeze it at import). An absolute
+    `deadline`, when passed by `_StoreLock`, tightens that same acquisition
+    budget instead of starting another full timeout after the in-process wait.
 
     Non-blocking attempts in a loop rather than one blocking call: a blocking
     Windows lock carries its own hidden 10s budget and then raises, which is
     harder to reason about than our own deadline — and this keeps both
     platforms on one code path.
     """
-    if timeout is None:
-        timeout = LOCK_TIMEOUT_SECONDS
     started = time.monotonic()
-    deadline = started + timeout
-    # A surrounding `lock_deadline()` block wins when it is tighter. That is how
-    # a cycle's leaf acquisitions share ONE budget instead of one each.
-    stack = getattr(_deadline_local, "stack", None)
-    if stack:
-        deadline = min(deadline, stack[-1])
+    deadline = _effective_lock_deadline(started, timeout=timeout, deadline=deadline)
     while True:
         try:
             if os.name == "nt":
@@ -287,7 +298,21 @@ class _StoreLock:
         self._depth = 0
 
     def __enter__(self) -> "_StoreLock":
-        self._rlock.acquire()
+        started = time.monotonic()
+        deadline = _effective_lock_deadline(started)
+        # The non-blocking fast path is important for both an uncontended lock
+        # and same-thread RLock re-entry: neither is a wait that should fail just
+        # because a surrounding deadline is already near or past its boundary.
+        acquired = self._rlock.acquire(blocking=False)
+        if not acquired:
+            remaining = deadline - time.monotonic()
+            acquired = remaining > 0 and self._rlock.acquire(timeout=remaining)
+            if not acquired or time.monotonic() >= deadline:
+                if acquired:
+                    self._rlock.release()
+                raise StoreLockTimeout(
+                    self._path, max(0.0, deadline - started),
+                    wait_for="another thread in this process")
         try:
             if self._depth == 0:
                 try:
@@ -300,7 +325,9 @@ class _StoreLock:
                     fd = -1
                 else:
                     try:
-                        _acquire_os_lock(fd, self._path)
+                        # Carry one absolute budget through the local RLock and
+                        # the OS lock rather than restarting the timeout here.
+                        _acquire_os_lock(fd, self._path, deadline=deadline)
                     except BaseException:
                         os.close(fd)
                         raise
