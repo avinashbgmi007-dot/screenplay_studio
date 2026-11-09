@@ -224,7 +224,7 @@ analyze/cancel (R2) plus library/backup (R7).)
 | POST | `/api/writer-memory/observations/<obs_id>/suppress` | `suppress_writer_observation` | Forget a scoped observation. |
 | POST | `/api/writer-memory/refresh` | `refresh_writer_memory` | Recompute the relationship card. |
 | GET | `/api/writer-library` | `get_writer_library` | Digest of every parsed project (PAST WORK block). |
-| GET | `/api/library/backup` | `backup_library` | Download EVERY project as one zip (with an embedded library manifest). |
+| GET | `/api/library/backup` | `backup_library` | Version-2 archive with separate project/idea sections; writer memory is excluded unless `?include_writer_memory=true`. Manual restore into an empty projects directory; no in-app import route. |
 
 ## Ideas (collection + single)
 

@@ -3318,19 +3318,67 @@ def backup_project(name):
     return resp
 
 
+def _archive_idea_section(zf, skipped, kept, withheld):
+    """Archive the ideas shelf under its own manifest section, not as a project."""
+    root = os.path.join(PROJECTS_DIR, "ideas")
+    if _is_archive_symlink(root):
+        return [], [{"section": "ideas",
+                     "error": "ideas directory is a symlink; refusing to follow it"}]
+    projects_root = os.path.realpath(PROJECTS_DIR)
+    ideas_root = os.path.realpath(root)
+    if ideas_root != projects_root and not ideas_root.startswith(projects_root + os.sep):
+        return [], [{"section": "ideas",
+                     "error": "ideas directory resolves outside the library"}]
+
+    counts = {}
+    failed = []
+    try:
+        for full, arc, kind in _archive_walk(ideas_root, "ideas"):
+            if kind:
+                _record_archive_symlink(skipped, arc, kind)
+                continue
+            if os.path.basename(full).endswith((".lock", ".tmp")):
+                continue
+            before = len(skipped)
+            _add_file_redacted(zf, full, arc, skipped, kept, withheld)
+            if len(skipped) == before:
+                relative = os.path.relpath(full, ideas_root).replace(os.sep, "/")
+                idea_id = relative.split("/", 1)[0]
+                counts[idea_id] = counts.get(idea_id, 0) + 1
+    except OSError as e:
+        failed.append({"section": "ideas", "error": str(e)})
+    return ([{"idea_id": idea_id, "files": count}
+             for idea_id, count in sorted(counts.items())], failed)
+
+
 @app.route("/api/library/backup", methods=["GET"])
 def backup_library():
-    """The WHOLE library as one .zip (audit R7/M5): every project directory,
-    plus a manifest of what was included. The per-project backup above saves
-    one desk; this saves the shelf — the writer's entire body of work in a
-    single click, nothing leaving the machine. The gap this closes: until it
-    existed, the only full copy of a writer's library was a manual, error-
-    prone copy of PROJECTS_DIR from inside the app's own data folder.
+    """Download projects and ideas as separate sections of one library archive.
 
-    Per-project failures are contained: a damaged or half-deleted project is
-    recorded in the manifest (so the writer KNOWS) instead of failing the
-    whole archive. Lock sidecars and mid-flight temp files are excluded, as
-    in the per-project backup."""
+    Relationship memory is excluded unless the writer explicitly opts in with
+    `?include_writer_memory=true`. Restore is intentionally manual into an
+    EMPTY projects directory; the archive manifest says so because this app has
+    no safe in-place import route. Every archive omission is recorded."""
+    raw_memory_choice = request.args.get("include_writer_memory")
+    if raw_memory_choice is None:
+        include_memory = False
+    elif raw_memory_choice.lower() in {"1", "true"}:
+        include_memory = True
+    elif raw_memory_choice.lower() in {"0", "false"}:
+        include_memory = False
+    else:
+        return _error("include_writer_memory must be true or false.", 400)
+
+    # The global CSRF/capability guard intentionally skips GETs. Once a studio
+    # token is configured, require it for the privacy-sensitive opt-in rather
+    # than assuming the browser's authenticated download helper is sufficient.
+    if include_memory and _API_TOKEN:
+        import hmac
+        supplied = request.headers.get("X-Studio-Token", "").encode(
+            "utf-8", "surrogateescape")
+        if not hmac.compare_digest(supplied, _API_TOKEN.encode("utf-8")):
+            return jsonify({"error": "missing or invalid capability token"}), 403
+
     buf = io.BytesIO()
     included, failed = [], []
     skipped: list[dict] = []
@@ -3338,11 +3386,12 @@ def backup_library():
     withheld: list[dict] = []
     stamp = time.strftime("%Y%m%d-%H%M")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        ideas, idea_failures = _archive_idea_section(zf, skipped, kept, withheld)
+        failed.extend(idea_failures)
         if os.path.isdir(PROJECTS_DIR):
             for name in sorted(os.listdir(PROJECTS_DIR)):
-                # Same exclusions as the shelf listing: the profile store is
-                # internal data, not a project; a lock sidecar is a file.
-                if name == "writer_profile.json":
+                # These are separately described archive sections, not projects.
+                if name in {"writer_profile.json", "ideas"}:
                     continue
                 candidate = os.path.join(PROJECTS_DIR, name)
                 if _is_archive_symlink(candidate):
@@ -3371,18 +3420,39 @@ def backup_library():
                             n_files += 1
                     included.append({"project": name, "files": n_files})
                 except OSError as e:
-                    # One unreadable project must not destroy the backup of
-                    # the other twenty — and must not be silent about it.
                     failed.append({"project": name, "error": str(e)})
+
+        memory_path = os.path.join(PROJECTS_DIR, "writer_profile.json")
+        memory = {
+            "included": False,
+            "path": None,
+            "reason": "excluded by default because it contains personal relationship memory",
+        }
+        if include_memory:
+            if not os.path.exists(memory_path):
+                memory["reason"] = "no writer relationship memory file exists"
+            else:
+                before = len(skipped)
+                _add_file(zf, memory_path, "writer_profile.json", skipped, kept)
+                if len(skipped) == before:
+                    memory = {"included": True, "path": "writer_profile.json",
+                              "reason": "included at the writer's explicit request"}
+                else:
+                    memory["reason"] = "file could not be safely included; see skipped"
+
         zf.writestr("library-backup.json", json.dumps({
             "kind": "script-doctor-library-backup",
+            "archive_version": 2,
             "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "projects": included,
+            "ideas": ideas,
+            "writer_memory": memory,
+            "restore": {
+                "mode": "manual",
+                "in_app_import": False,
+                "target": "an empty projects directory",
+            },
             "failed": failed,
-            # Gap 72: files that were skipped, named. The manifest counted what
-            # it INCLUDED and reported projects it could not read, but a file
-            # that vanished mid-zip was dropped without a word — the archive
-            # still said it was a backup of everything.
             "skipped": skipped,
             "complete": not (skipped or failed),
             "credentials_withheld": withheld,
@@ -3392,6 +3462,8 @@ def backup_library():
                      download_name=f"script-doctor-library-backup-{stamp}.zip")
     _mark_completeness(resp, skipped, failed)
     _mark_credentials(resp, withheld)
+    resp.headers["X-Backup-Writer-Memory"] = (
+        "included" if memory["included"] else "withheld")
     return resp
 
 

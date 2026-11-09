@@ -1135,8 +1135,12 @@ function renderDashboard() {
     allBtn.hidden = !projects.length;
     if (projects.length && !allBtn.dataset.wired) {
       allBtn.dataset.wired = "1";
-      allBtn.addEventListener("click", () =>
-        downloadBackup("/api/library/backup", "script-doctor-library-backup.zip"));
+      allBtn.addEventListener("click", () => {
+        const includeMemory = window.confirm(
+          "Include Sam's writer relationship memory in this archive? It can contain personal preferences and observations.\n\nChoose OK to include it; Cancel downloads the archive without it.");
+        const suffix = includeMemory ? "?include_writer_memory=true" : "";
+        return downloadBackup(`/api/library/backup${suffix}`, "script-doctor-library-backup.zip");
+      });
     }
   }
 
