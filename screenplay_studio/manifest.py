@@ -68,6 +68,48 @@ def _merge_drafts(baseline: dict, desired: dict, on_disk: dict):
     return merged, renamed
 
 
+def _merge_stage(baseline: dict, desired: dict, on_disk: dict) -> dict:
+    """Three-way merge one stage by field and output-path key.
+
+    Two objects can legitimately update different facts in the same stage.
+    Replacing the whole stage when either object saves loses the other writer's
+    untouched fields. Changed scalar fields and changed output keys use
+    last-save-wins; untouched values come from disk. A deletion only removes a
+    baseline value when disk still has that same value, so it cannot erase a
+    peer's newer replacement.
+    """
+    missing = object()
+    out = dict(on_disk or {})
+    base = baseline or {}
+    want = desired or {}
+    disk_paths = dict((on_disk or {}).get("output_paths") or {})
+    base_paths = dict(base.get("output_paths") or {})
+    want_paths = dict(want.get("output_paths") or {})
+
+    # StageStatus scalar fields. Keep any unknown on-disk metadata untouched.
+    scalar_fields = {"status", "error", "updated_at"}
+    for key in scalar_fields:
+        old = base.get(key, missing)
+        new = want.get(key, missing)
+        if new != old:
+            if new is missing:
+                if out.get(key, missing) == old:
+                    out.pop(key, None)
+            else:
+                out[key] = new
+
+    # Merge output_paths by member. A same-key conflict is intentionally
+    # last-save-wins; an untouched peer key survives this writer's save.
+    for key, old in base_paths.items():
+        if key not in want_paths and disk_paths.get(key, missing) == old:
+            disk_paths.pop(key, None)
+    for key, new in want_paths.items():
+        if key not in base_paths or base_paths[key] != new:
+            disk_paths[key] = new
+    out["output_paths"] = disk_paths
+    return out
+
+
 def _merge_manifest(baseline: dict, desired: dict, on_disk: dict) -> dict:
     """Fold what this writer changed into the document that is on disk now.
 
@@ -83,8 +125,11 @@ def _merge_manifest(baseline: dict, desired: dict, on_disk: dict) -> dict:
     baseline_stages = baseline.get("stages") or {}
     stages = dict(disk_stages)
     for name, value in (desired.get("stages") or {}).items():
-        if baseline_stages.get(name) != value or name not in disk_stages:
+        if name not in disk_stages:
             stages[name] = value
+        elif baseline_stages.get(name) != value:
+            stages[name] = _merge_stage(
+                baseline_stages.get(name) or {}, value, disk_stages[name])
     out["stages"] = stages
     for key, value in desired.items():
         if key in ("stages", "drafts"):
@@ -413,7 +458,15 @@ class ProjectManifest:
                 m.stages[name] = StageStatus()
         # Every path that reads a manifest from disk goes through here, so this
         # is where a writer learns what it is allowed to overwrite.
-        m._baseline = copy.deepcopy(d)
+        # `from_dict` materializes missing stages with default StageStatus values.
+        # Normalize the merge baseline the same way: otherwise a stale object's
+        # untouched synthesized `pending` stage looks like a change from a
+        # missing key and can overwrite a peer that created the stage later.
+        baseline = copy.deepcopy(d)
+        baseline_stages = baseline.setdefault("stages", {})
+        for name, stage in m.stages.items():
+            baseline_stages.setdefault(name, stage.to_dict())
+        m._baseline = baseline
         return m
 
     def save(self) -> None:
