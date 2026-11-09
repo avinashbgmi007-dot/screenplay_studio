@@ -35,8 +35,9 @@ class LlamaServerClient(BaseLlamaClient):
         super().__init__(base_url, model=model, timeout=timeout, extra_headers=extra_headers,
                          fallback_to_loaded=fallback_to_loaded)
 
-    def list_models(self) -> list[str]:
-        entries = self.list_models_raw()
+    def list_models(self, deadline: float | None = None) -> list[str]:
+        entries = (self.list_models_raw() if deadline is None
+                   else self.list_models_raw(deadline=deadline))
         ids = [e.get("id") or e.get("name") for e in entries]
         return [i for i in ids if i]
 

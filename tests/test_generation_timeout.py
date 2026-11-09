@@ -113,21 +113,22 @@ def test_budget_error_message_reports_actual_attempts():
 
         @staticmethod
         def monotonic():
-            FakeTime.t += 2.0
             return FakeTime.t
 
         @staticmethod
         def sleep(s):
-            pass
+            FakeTime.t += s
 
     calls = {"n": 0}
 
     def fake_post(url, json=None, timeout=None, headers=None, **transport):
         calls["n"] += 1
+        FakeTime.t = 4.0  # the in-flight attempt consumes the remaining deadline
         import requests as _r
         raise _r.exceptions.Timeout("hung")
 
     with mock.patch("screenplay_analyzer.llm_client.time", FakeTime), \
+            mock.patch("screenplay_analyzer.llm_client_base.time", FakeTime), \
             mock.patch("requests.post", side_effect=fake_post):
         with pytest.raises(LlamaServerError) as ei:
             c.chat_json("s", "u", retries=2, wall_clock=3.0)
@@ -149,8 +150,9 @@ def test_default_budget_applies_without_opt_in():
 
     with mock.patch("requests.post", side_effect=fake_post):
         c.chat_json("s", "u")
-    # ceil on the remaining slice keeps a healthy generation's full window
-    assert seen["timeout"] == 600, "a generous budget must not cut a healthy generation short"
+    # The monotonic deadline is authoritative; allow its tiny setup cost but
+    # never grant a request more than the configured 600-second budget.
+    assert 599.0 < seen["timeout"] <= 600.0, seen["timeout"]
 
 
 # ---------------------------------------------------------------------------

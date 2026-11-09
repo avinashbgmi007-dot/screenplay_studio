@@ -14,8 +14,10 @@ import time
 
 from .llm_client_base import (  # noqa: F401 — ModelNotFoundError is re-exported via screenplay_analyzer/__init__
     BaseLlamaClient,
+    DeadlineExceededError,
     LlamaServerError,
     ModelNotFoundError,
+    _call_with_deadline,
 )
 
 
@@ -112,6 +114,18 @@ def _diagnose_parse_failure(error: Exception, choice: dict, data: dict, content:
     return " ".join(parts)
 
 
+def _sleep_with_deadline(seconds: float, deadline: float | None) -> bool:
+    """Sleep no longer than the call's remaining budget; return if retry is viable."""
+    if deadline is None:
+        time.sleep(seconds)
+        return True
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return False
+    time.sleep(min(seconds, remaining))
+    return time.monotonic() < deadline
+
+
 class LlamaServerClient(BaseLlamaClient):
     def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
                  fallback_to_loaded: bool = False, fast_model: str | None = None):
@@ -120,13 +134,13 @@ class LlamaServerClient(BaseLlamaClient):
         self.fast_model = fast_model or None
         self.model_used_by_tier: dict[str, str] = {}
 
-    def resolve_model(self) -> str:
-        model = super().resolve_model()
+    def resolve_model(self, deadline: float | None = None) -> str:
+        model = super().resolve_model(deadline=deadline)
         self.model_used_by_tier["primary"] = model
         return model
 
-    def list_models(self) -> list[dict]:
-        return self.list_models_raw()
+    def list_models(self, deadline: float | None = None) -> list[dict]:
+        return _call_with_deadline(self.list_models_raw, deadline=deadline)
 
     def chat_json(
         self,
@@ -148,21 +162,22 @@ class LlamaServerClient(BaseLlamaClient):
         fast=True routes the call to the optional cheap tier (fast_model):
         summaries/refresh-style calls where a lighter model is fine.
 
-        wall_clock: a total budget (seconds) for this LOGICAL call — every
-        HTTP attempt inside it, including the internal parse-failure retries
-        and the server's busy window, must fit inside it. Without it, one
-        logical call could legally take (retries+1) x timeout plus busy
-        backoff — minutes of dead air in an analysis run (audit M1). The
-        budget degrades gracefully: if a budget slice shrinks below the
-        configured timeout, the slice wins; if it would go non-positive,
-        the call stops attempting. None disables the budget (old behavior).
+        wall_clock: a best-effort total budget (seconds) for this LOGICAL call,
+        including model discovery, busy backoff, and outer retries. Each request
+        timeout is capped by the remaining time and no retry is scheduled after
+        expiry. Requests cannot guarantee a hard end-to-end deadline or cancel
+        provider-side work already accepted. None disables the budget.
         """
+        deadline = time.monotonic() + wall_clock if wall_clock is not None else None
+        if deadline is not None and deadline <= time.monotonic():
+            raise DeadlineExceededError("The logical call deadline expired before model selection.")
         if fast and self.fast_model:
             tier = "fast"
-            model = self.resolve_model_id(self.fast_model)
+            model = _call_with_deadline(
+                self.resolve_model_id, self.fast_model, deadline=deadline)
         else:
             tier = "primary"
-            model = self.resolve_model()
+            model = _call_with_deadline(self.resolve_model, deadline=deadline)
         self.model_used_by_tier[tier] = model
         payload = {
             "model": model,
@@ -198,7 +213,12 @@ class LlamaServerClient(BaseLlamaClient):
 
         last_error = None
         attempts_made = 0
-        deadline = (time.monotonic() + wall_clock) if wall_clock else None
+        deadline_expired = False
+
+        def record_http_attempt():
+            nonlocal attempts_made
+            attempts_made += 1
+
         for attempt in range(retries + 1):
             # Per-attempt timeout: this attempt's slice of the remaining
             # budget, capped at the configured timeout — a slow-but-healthy
@@ -211,23 +231,27 @@ class LlamaServerClient(BaseLlamaClient):
             if deadline is not None:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    deadline_expired = True
                     break
                 # ceil so a fresh full-budget attempt keeps its exact
                 # configured timeout (599.9999 would otherwise be reported —
                 # and behave — as a hair under what the caller configured).
                 import math as _math
                 slice_ = min(_math.ceil(remaining), float(self.timeout))
-            attempts_made += 1  # a request is being SENT (success or not)
             try:
-                data = self._post_chat(payload, busy_retries=6, timeout=slice_)
+                data = self._post_chat(
+                    payload, busy_retries=6, timeout=slice_, deadline=deadline,
+                    on_attempt=record_http_attempt)
+            except DeadlineExceededError as e:
+                last_error = str(e)
+                deadline_expired = True
+                break
             except LlamaServerError as e:
                 last_error = str(e)
-                if attempt < retries:
-                    # The 1s settle is NOT deducted from the budget; the
-                    # budget measures generation time. Worst-case drift is
-                    # ~1s per attempt against a 600s budget — acceptable.
-                    time.sleep(1)
+                if attempt < retries and _sleep_with_deadline(1, deadline):
                     continue
+                if deadline is not None and time.monotonic() >= deadline:
+                    deadline_expired = True
                 break
 
             try:
@@ -235,22 +259,27 @@ class LlamaServerClient(BaseLlamaClient):
                 content = choice["message"]["content"]
             except (KeyError, IndexError) as e:
                 last_error = f"Unexpected response shape from llama-server (missing choices/message/content): {e}"
-                if attempt < retries:
-                    time.sleep(1)
+                if attempt < retries and _sleep_with_deadline(1, deadline):
                     continue
+                if deadline is not None and time.monotonic() >= deadline:
+                    deadline_expired = True
                 break
 
             try:
                 return _extract_json(content)
             except ValueError as e:
                 last_error = _diagnose_parse_failure(e, choice, data, content)
-                if attempt < retries:
-                    time.sleep(1)
+                if attempt < retries and _sleep_with_deadline(1, deadline):
                     continue
+                if deadline is not None and time.monotonic() >= deadline:
+                    deadline_expired = True
                 break
 
-        raise LlamaServerError(
+        message = (
             f"Model output could not be parsed as JSON after {attempts_made} attempt(s)"
-            + (f" within the {wall_clock:.0f}s wall-clock budget" if wall_clock else "")
+            + (f" within the {wall_clock:.0f}s wall-clock budget" if wall_clock is not None else "")
             + f". Last error: {last_error}"
         )
+        if deadline_expired:
+            raise DeadlineExceededError(message)
+        raise LlamaServerError(message)

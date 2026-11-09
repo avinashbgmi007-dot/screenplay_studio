@@ -12,6 +12,7 @@ from __future__ import annotations
 from urllib.parse import urlsplit, urlunsplit
 
 import hashlib
+import inspect
 import random
 import re
 import threading
@@ -49,6 +50,25 @@ class LlamaServerError(Exception):
 
 class ModelNotFoundError(LlamaServerError):
     pass
+
+
+class DeadlineExceededError(LlamaServerError):
+    """The logical model call's monotonic budget expired before more work."""
+
+
+def _call_with_deadline(method, *args, deadline: float | None):
+    """Pass a deadline to deadline-aware overrides without breaking older hooks."""
+    if deadline is None:
+        return method(*args)
+    try:
+        parameters = inspect.signature(method).parameters.values()
+    except (TypeError, ValueError):
+        return method(*args, deadline=deadline)
+    accepts_deadline = any(
+        parameter.name == "deadline" or parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters
+    )
+    return method(*args, deadline=deadline) if accepts_deadline else method(*args)
 
 
 def normalize_openai_base_url(base_url: str) -> str:
@@ -124,16 +144,25 @@ class BaseLlamaClient:
         self._resolved_model: str | None = None
         self._available_ids: list[str] | None = None
 
-    def list_models(self) -> list:
+    def list_models(self, deadline: float | None = None) -> list:
         """Override in subclass: return model ids in the expected format.
         Analyzer returns raw dicts; cowriter returns string ids."""
-        return self.list_models_raw()
+        return _call_with_deadline(self.list_models_raw, deadline=deadline)
 
-    def list_models_raw(self) -> list[dict]:
-        """Raw /v1/models response dicts."""
+    def list_models_raw(self, deadline: float | None = None) -> list[dict]:
+        """Raw /v1/models response dicts; optionally budget discovery too."""
+        timeout = 15.0
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DeadlineExceededError("The logical call deadline expired before model discovery.")
+            timeout = min(timeout, remaining)
         try:
             resp = request_no_redirects("get", f"{self.base_url}/v1/models",
-                                        timeout=15, headers=self.extra_headers)
+                                        timeout=timeout, headers=self.extra_headers)
+            if deadline is not None and time.monotonic() >= deadline:
+                raise DeadlineExceededError(
+                    "The logical call deadline expired during model discovery.")
             resp.raise_for_status()
         except RedirectRefusedError as e:
             raise LlamaServerError(str(e)) from e
@@ -143,24 +172,31 @@ class BaseLlamaClient:
                 f"Is it running? (launch with `llama-server -m <model.gguf> --port ...`)"
             ) from e
         except requests.exceptions.Timeout as e:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise DeadlineExceededError(
+                    "The logical call deadline expired while discovering the loaded model.") from e
             raise LlamaServerError(f"Timed out connecting to {self.base_url}") from e
         except requests.exceptions.HTTPError as e:
             raise LlamaServerError(f"llama-server at {self.base_url} returned an error: {e}") from e
         data = resp.json()
         return data.get("data", []) or data.get("models", [])
 
-    def _available(self) -> list[str]:
-        """Loaded model ids, cached per client."""
+    def _available(self, deadline: float | None = None) -> list[str]:
+        """Loaded model ids, cached per client; discovery can share a deadline."""
         if self._available_ids is None:
-            available = self.list_models()
+            # Preserve third-party/subclass overrides that predate deadline-aware
+            # discovery while passing the budget wherever the hook supports it.
+            available = _call_with_deadline(self.list_models, deadline=deadline)
             ids = [m.get("id") or m.get("name") for m in available]
             self._available_ids = [a for a in ids if a]
         return self._available_ids
 
-    def resolve_model_id(self, model_id: str | None) -> str:
-        """Resolve a specific model id against what's loaded, applying the
-        fallback policy. Never mutates self.model."""
-        available_ids = self._available()
+    def resolve_model_id(self, model_id: str | None, deadline: float | None = None) -> str:
+        """Resolve a model id against loaded models under the optional deadline.
+
+        Never mutates self.model.
+        """
+        available_ids = self._available(deadline=deadline)
         if not available_ids:
             raise LlamaServerError(f"llama-server at {self.base_url} reports no loaded models.")
         if model_id:
@@ -174,9 +210,10 @@ class BaseLlamaClient:
             )
         return available_ids[0]
 
-    def resolve_model(self) -> str:
+    def resolve_model(self, deadline: float | None = None) -> str:
         if not self._resolved_model:
-            self._resolved_model = self.resolve_model_id(self.model)
+            self._resolved_model = _call_with_deadline(
+                self.resolve_model_id, self.model, deadline=deadline)
         return self._resolved_model
 
     def is_reachable(self) -> bool:
@@ -291,25 +328,44 @@ class BaseLlamaClient:
             return bool(re.search(r"(busy|in progress|already running|another request)", body or "", re.IGNORECASE))
         return False
 
-    def _post_chat(self, payload: dict, busy_retries: int = 6, timeout: float | None = None) -> dict:
-        """POST to /v1/chat/completions with busy-retry. Returns the parsed JSON data.
+    def _post_chat(self, payload: dict, busy_retries: int = 6, timeout: float | None = None,
+                   deadline: float | None = None, on_attempt=None) -> dict:
+        """POST to chat completions with bounded busy retries.
 
-        `timeout` overrides self.timeout for THIS request (seconds). The chat
-        layer passes a shrinking value when it is enforcing a wall-clock
-        budget across its retries, so N attempts can never take N x timeout
-        (audit M1). None keeps the client's configured timeout."""
+        `timeout` overrides self.timeout for this request. When supplied, the
+        absolute monotonic `deadline` also bounds retry scheduling and each
+        attempt's timeout slice. It cannot cancel work already accepted by a
+        provider, and Requests' timeout is not a hard total-duration guarantee.
+        """
         eff_timeout = self.timeout if timeout is None else timeout
         attempt = 0
         while True:
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise DeadlineExceededError("The logical call deadline expired before the next chat attempt.")
+                eff_timeout = min(eff_timeout, remaining)
             try:
+                if on_attempt is not None:
+                    on_attempt()
                 resp = request_no_redirects(
                     "post", f"{self.base_url}/v1/chat/completions",
                     json=payload, timeout=eff_timeout, headers=self.extra_headers,
                 )
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise DeadlineExceededError("The logical call deadline expired during a chat attempt.")
                 status = getattr(resp, "status_code", 200)
                 if self._check_busy(status, getattr(resp, "text", "") or "") and attempt < busy_retries:
                     attempt += 1
-                    time.sleep(busy_retry_delay(attempt))
+                    delay = busy_retry_delay(attempt)
+                    if deadline is not None:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise DeadlineExceededError("The logical call deadline expired after a busy response.")
+                        delay = min(delay, remaining)
+                    time.sleep(delay)
+                    if deadline is not None and time.monotonic() >= deadline:
+                        raise DeadlineExceededError("The logical call deadline expired during busy backoff.")
                     continue
                 if self._invalidate_context_window_on_rejection(resp):
                     raise LlamaServerError(
@@ -321,6 +377,9 @@ class BaseLlamaClient:
             except requests.exceptions.ConnectionError as e:
                 raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e
             except requests.exceptions.Timeout as e:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise DeadlineExceededError(
+                        "The logical call deadline expired during a chat attempt.") from e
                 raise LlamaServerError(
                     f"Request to {self.base_url} timed out after {eff_timeout}s. "
                     f"For a large/slow local model, consider raising the client timeout."
