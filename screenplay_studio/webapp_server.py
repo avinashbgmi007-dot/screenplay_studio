@@ -2857,6 +2857,36 @@ def _start_progress_heartbeat(m) -> None:
     })
 
 
+def _completed_analysis_response(m, elapsed: float):
+    """Return success for a completed analysis even if telemetry cannot be saved.
+
+    The report and complete stage are the operation's result. Metrics are a
+    secondary record: a busy or damaged metrics store cannot make that finished
+    analysis un-happen, and must not invite an expensive duplicate run. By
+    contrast, failures before/during orchestration still use their normal error
+    paths and never reach this helper.
+    """
+    from .metrics import record_analysis
+    try:
+        record_analysis(m, elapsed)
+    except Exception:
+        # Retain a diagnostic for the local operator, but don't turn a completed
+        # report into a retryable 503/500. Keep internal paths out of the API.
+        traceback.print_exc()
+        metrics_recorded = False
+    else:
+        metrics_recorded = True
+
+    _record_pass(m)
+    response = _manifest_summary_with_code(m)
+    response["analysis_metrics_recorded"] = metrics_recorded
+    if not metrics_recorded:
+        response["analysis_metrics_warning"] = (
+            "Analysis completed and the report is ready, but its timing metrics "
+            "could not be saved. No rerun is needed.")
+    return jsonify(response)
+
+
 def _record_pass(m) -> None:
     """spec §15.4: stamp the revision arc — and the status-strip finding count —
     with this pass's numbers.
@@ -2970,10 +3000,7 @@ def _analyze_locked(m, name):
         traceback.print_exc()
         return _error(f"Unexpected error during analysis: {e}", 500)
 
-    from .metrics import record_analysis
-    record_analysis(m, _t.time() - _t0)
-    _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
-    return jsonify(_manifest_summary_with_code(m))
+    return _completed_analysis_response(m, _t.time() - _t0)
 
 
 @app.route("/api/projects/<name>/analyze/retry-failed", methods=["POST"])
@@ -3046,10 +3073,7 @@ def _retry_failed_locked(m):
         traceback.print_exc()
         return _error(f"Unexpected error during retry: {e}", 500)
 
-    from .metrics import record_analysis
-    record_analysis(m, _t.time() - _t0)
-    _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
-    return jsonify(_manifest_summary_with_code(m))
+    return _completed_analysis_response(m, _t.time() - _t0)
 
 
 def _mark_completeness(resp, skipped: list, failed: list | None = None) -> None:
