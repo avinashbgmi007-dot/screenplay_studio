@@ -70,7 +70,7 @@
   loopback-only, Host-guarded, and not a browser surface. Recorded as a limit, not
   claimed as closed.
 
-**Totals:** 104 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **106**.
+**Totals:** 105 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **107**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
 after adding or changing any `@app.route` — this map had drifted by +4 before
 the 2026-09-30 audit, the verdict channel added 5 more, and this branch added
@@ -108,8 +108,9 @@ analyze/cancel (R2) plus library/backup (R7).)
 
 | Method | Path | Handler | Purpose |
 |--------|------|---------|---------|
-| GET | `/api/projects/<name>` | `get_project` | Project summary (`_manifest_summary`); `?shelf_preview=1` locally previews the other projects' titles, characters and themes before cross-project prompt consent. |
+| GET | `/api/projects/<name>` | `get_project` | Project summary (`_manifest_summary`), persisted graduation-transfer status when present; `?shelf_preview=1` locally previews the other projects' titles, characters and themes before cross-project prompt consent. |
 | DELETE | `/api/projects/<name>` | `delete_project` | Delete a project (guarded inside `PROJECTS_DIR`). |
+| POST | `/api/projects/<name>/retry-graduation-transfer` | `retry_graduation_transfer` | Retry premise/session transfer from the idea recorded for this project; identical components are idempotent and differing destination data is preserved. |
 | POST | `/api/projects/<name>/shelf-sharing` | `set_project_shelf_sharing` | Set this project's explicit, default-off consent for other scripts' prompt context (`{"enabled": true/false}`). |
 | POST | `/api/projects/<name>/analyze` | `analyze_project` | Run the 12-pass analysis (resumable; `?force` resets). |
 | POST | `/api/projects/<name>/analyze/cancel` | `cancel_analyze` | Ask the running analysis to stop (co-operative; restores the pre-run stage). |
@@ -238,7 +239,7 @@ analyze/cancel (R2) plus library/backup (R7).)
 | POST | `/api/ideas/<idea_id>/rename` | `rename_idea` | Rename an Idea. |
 | POST | `/api/ideas/<idea_id>/card` | `save_idea_card` | Save the premise card. |
 | DELETE | `/api/ideas/<idea_id>` | `delete_idea` | Delete an Idea. |
-| POST | `/api/ideas/<idea_id>/graduate` | `graduate_idea` | Turn an Idea into a Project. |
+| POST | `/api/ideas/<idea_id>/graduate` | `graduate_idea` | Create a project only after a readable-scene check; returns persisted per-component premise/session transfer status while preserving the source idea. |
 
 ## Preview lab (Design Lab prototypes)
 
@@ -274,7 +275,7 @@ mechanical half (what actually exists). `tests/test_route_map_is_current.py`
 checks both directions, so a route added without a row and a row left
 behind by a deleted route both fail the suite.
 
-**102 live `/api` routes.**
+**103 live `/api` routes.**
 
 | Method | Path | Endpoint |
 |---|---|---|
@@ -371,6 +372,7 @@ behind by a deleted route both fail the suite.
 | POST | `/api/projects/<name>/quickcheck` | `quickcheck_project` |
 | POST | `/api/projects/<name>/repair` | `repair_project` |
 | POST | `/api/projects/<name>/reparse` | `reparse_project` |
+| POST | `/api/projects/<name>/retry-graduation-transfer` | `retry_graduation_transfer` |
 | POST | `/api/projects/<name>/rewrite` | `rewrite_scene_endpoint` |
 | POST | `/api/projects/<name>/shelf-sharing` | `set_project_shelf_sharing` |
 | POST | `/api/projects/<name>/stash` | `add_stash` |

@@ -1989,7 +1989,9 @@ async function graduateIdea(file) {
     await loadProjects();
     await loadIdeas();
     await openProject(project.project);
-    appendSystemNote("The premise card and your conversation came with you — same desk, same Sameer.");
+    if (state.currentProject === project.project) {
+      appendGraduationTransferNote(project.project, project.graduation || {});
+    }
   } catch (e) {
     showError("Couldn't graduate the idea: " + e.message);
   } finally {
@@ -2788,6 +2790,9 @@ async function openProject(name) {
     // a project opens with the manuscript center stage — the partner drawer
     // stays closed until summoned (gutter tab, room toggle, or select-to-ask)
     closeRoomDrawer();
+    if (project.graduation && project.graduation.complete !== true) {
+      appendGraduationTransferNote(name, project.graduation);
+    }
     saveSession();
   } catch (e) {
     showError("Couldn't open that project: " + e.message);
@@ -3670,7 +3675,7 @@ function renderMessage(m, index) {
   return wrap;
 }
 
-function appendSystemNote(text, isError) {
+function appendSystemNote(text, isError, action) {
   const container = $("#messages-scroll");
   if (container.querySelector(".chat-empty-hint")) container.innerHTML = "";
   const note = el("div", "msg assistant");
@@ -3678,9 +3683,75 @@ function appendSystemNote(text, isError) {
   const bubble = el("div", "msg-bubble", text);
   if (isError) bubble.style.color = "var(--danger)";
   note.appendChild(bubble);
+  if (action && typeof action.run === "function") {
+    const button = el("button", "btn-secondary btn-small", action.label || "Retry");
+    button.type = "button";
+    button.addEventListener("click", () => action.run(button));
+    note.appendChild(button);
+  }
   container.appendChild(note);
   container.scrollTop = container.scrollHeight;
   updateRailPositions(container);
+  return note;
+}
+
+function graduationTransferMessage(transfer) {
+  const premise = transfer.premise || {};
+  const sessions = transfer.sessions || {};
+  const premiseOk = ["copied", "already_present"].includes(premise.status);
+  const parts = [`Premise card: ${premiseOk ? "carried" : "not confirmed as carried"}.`];
+  if (sessions.status === "empty" || sessions.expected === 0) {
+    parts.push("Saved conversation: none existed.");
+  } else if (Number.isFinite(sessions.expected)) {
+    const done = (sessions.copied || []).length + (sessions.already_present || []).length;
+    parts.push(`Conversation sessions: ${done} of ${sessions.expected} carried.`);
+    const failed = (sessions.failed || []).map(row => row && row.id).filter(Boolean);
+    if (failed.length) parts.push(`Not carried: ${failed.join(", ")}.`);
+  } else {
+    parts.push("Conversation transfer status is unknown.");
+  }
+  const pin = transfer.session_pin || {};
+  if (pin.status === "failed") parts.push("The carried conversation could not be selected as the active thread.");
+  if (pin.status === "deferred") parts.push("No partial conversation was selected as the active thread.");
+  if (transfer.complete === true) return `Graduation transfer complete. ${parts.join(" ")}`;
+  return `Graduation is incomplete. ${parts.join(" ")} Your original idea remains available. Retry will continue into this project without replacing different destination data.`;
+}
+
+function appendGraduationTransferNote(projectName, transfer) {
+  const container = $("#messages-scroll");
+  for (const old of container.querySelectorAll(".graduation-transfer-note")) {
+    if (old.dataset.projectName === projectName) old.remove();
+  }
+  const complete = transfer.complete === true;
+  const action = !complete && transfer.retryable === true
+    ? { label: "Retry transfer into this project",
+        run: button => retryGraduationTransfer(projectName, button) }
+    : null;
+  const note = appendSystemNote(graduationTransferMessage(transfer), !complete, action);
+  note.classList.add("graduation-transfer-note");
+  note.dataset.projectName = projectName;
+  return note;
+}
+
+async function retryGraduationTransfer(projectName, button) {
+  button.disabled = true;
+  button.textContent = "Retrying transfer…";
+  try {
+    const response = await api(
+      `/projects/${encodeURIComponent(projectName)}/retry-graduation-transfer`,
+      { method: "POST" });
+    await loadProjects();
+    if (state.currentProject !== projectName) return;
+    await openProject(projectName);
+    if (state.currentProject === projectName
+        && response.graduation && response.graduation.complete === true) {
+      appendGraduationTransferNote(projectName, response.graduation);
+    }
+  } catch (e) {
+    button.disabled = false;
+    button.textContent = "Retry transfer into this project";
+    showError("Couldn't retry the idea transfer: " + e.message + " The original idea remains available.");
+  }
 }
 
 // ---------- select-to-reply ----------

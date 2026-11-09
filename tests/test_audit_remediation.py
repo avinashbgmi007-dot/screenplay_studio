@@ -234,8 +234,9 @@ class TestF05RouteMapTotals:
         # 91 (audit baseline) + 5 verdict-channel routes + analyze/cancel (R2)
         # + library/backup (R7) = 98, + ideas/recover and ideas/repair (gap 70)
         # = 100, + projects/recover, projects/recover/backup and projects/repair
-        # (gap 80) = 103, + project shelf-sharing consent (gap 31) = 104
-        assert counts["screenplay_studio/webapp_server.py"] == 104, (
+        # (gap 80) = 103, + project shelf-sharing consent (gap 31) = 104,
+        # + same-project graduation transfer retry (gap 55) = 105
+        assert counts["screenplay_studio/webapp_server.py"] == 105, (
             "the count the route map pins moved: regenerate the map (its header "
             "says how) and update this pin together")
 

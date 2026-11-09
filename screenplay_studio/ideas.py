@@ -22,7 +22,8 @@ import shutil
 import time
 import uuid
 
-from .jsonio import atomic_write_json, check_safe_id, damage_envelope, last_known_facts, lock_for, retry_permission
+from .jsonio import (atomic_create_json, atomic_write_json, check_safe_id,
+                     damage_envelope, last_known_facts, lock_for, retry_permission)
 
 EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 
@@ -272,21 +273,95 @@ class IdeaStore:
 
     # ---- graduation ----
 
-    def carry_into_project(self, idea_id: str, project_dir: str) -> None:
-        """Copy the premise card and the idea's conversation into a real
-        project so the thread survives the move to the script desk."""
+    @staticmethod
+    def _create_or_confirm_json(path: str, value: dict) -> tuple[str, str | None]:
+        """Publish once; an identical retry is success, different data is safe conflict."""
+        with lock_for(path):
+            try:
+                if atomic_create_json(path, value):
+                    return "copied", None
+            except Exception as exc:
+                return "failed", type(exc).__name__
+            try:
+                with open(path, encoding="utf-8") as f:
+                    existing = json.load(f)
+            except Exception:
+                return "conflict", "The destination already exists but cannot be read."
+            if existing == value:
+                return "already_present", None
+            return "conflict", "The destination contains different data; it was not overwritten."
+
+    def carry_into_project(self, idea_id: str, project_dir: str) -> dict:
+        """Carry premise and sessions without overwriting different project data.
+
+        Repeating the operation is safe: an identical destination component is
+        reported as already present, while a conflicting destination is kept
+        intact. Component failures are returned so graduation can report partial
+        success instead of collapsing it to a misleading boolean.
+        """
         meta = self.load(idea_id)
         card = dict(meta.get("card") or EMPTY_CARD)
         # the blank page is the primary material — carry it too, so the script
         # desk keeps the notes the idea grew from
         card["content"] = meta.get("content") or ""
-        # A3 (2026-09-20): atomic like every other writer-owned store — a torn
-        # premise.json used to read back as "no card" and silently lose the
-        # writer's logline/premise on graduation.
-        atomic_write_json(os.path.join(project_dir, "premise.json"), card)
+        premise_status, premise_reason = self._create_or_confirm_json(
+            os.path.join(project_dir, "premise.json"), card)
+        premise = {"status": premise_status}
+        if premise_reason:
+            premise["reason"] = premise_reason
+
         src = self.sessions_dir(idea_id)
         dst = os.path.join(project_dir, "sessions")
-        os.makedirs(dst, exist_ok=True)
-        for fn in os.listdir(src):
-            if fn.endswith(".json"):
-                shutil.copy2(os.path.join(src, fn), os.path.join(dst, fn))
+        sessions = {"status": "empty", "expected": 0,
+                    "copied": [], "already_present": [], "failed": []}
+        try:
+            files = sorted(fn for fn in os.listdir(src)
+                           if fn.endswith(".json") and os.path.basename(fn) == fn)
+        except FileNotFoundError:
+            files = []
+        except OSError:
+            sessions.update(status="failed", expected=None)
+            sessions["failed"].append({"id": None, "reason": "Could not list source sessions."})
+            files = []
+
+        if files:
+            sessions["expected"] = len(files)
+            try:
+                os.makedirs(dst, exist_ok=True)
+            except OSError:
+                for filename in files:
+                    sessions["failed"].append({
+                        "id": filename[:-5], "reason": "Could not create the project sessions folder."})
+            else:
+                for filename in files:
+                    session_id = filename[:-5]
+                    target = os.path.join(dst, filename)
+                    try:
+                        check_safe_id(session_id, "session id")
+                        source_path = os.path.join(src, filename)
+                        # SessionStore updates the same JSON through this lock;
+                        # take a consistent snapshot before publishing it.
+                        with lock_for(source_path):
+                            with open(source_path, encoding="utf-8") as f:
+                                session_data = json.load(f)
+                        status, reason = self._create_or_confirm_json(target, session_data)
+                    except Exception as exc:
+                        status, reason = "failed", type(exc).__name__
+                    if status == "copied":
+                        sessions["copied"].append(session_id)
+                    elif status == "already_present":
+                        sessions["already_present"].append(session_id)
+                    else:
+                        sessions["failed"].append({
+                            "id": session_id,
+                            "reason": reason or "Session could not be copied."})
+            if sessions["failed"]:
+                successes = len(sessions["copied"]) + len(sessions["already_present"])
+                sessions["status"] = "partial" if successes else "failed"
+            else:
+                sessions["status"] = "complete"
+
+        premise_ok = premise_status in ("copied", "already_present")
+        sessions_ok = sessions["status"] in ("complete", "empty")
+        return {"complete": premise_ok and sessions_ok,
+                "premise": premise, "sessions": sessions}

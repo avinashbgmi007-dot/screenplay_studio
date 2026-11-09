@@ -75,7 +75,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `beatboard.py` | `get_order`, `set_order`, `reset_order`, `has_board`, `export_reordered`, `board_view` | Scene reordering / beat board |
 | `notes.py` | `load_notes`, `notes_for_scene`, `add_note`, `update_note`, `delete_note` | Per-project notes |
 | `watch.py` | `process_pending`, `watch_loop` | Watch-folder auto-analysis |
-| `ideas.py` | `IdeaStore` | Idea room store: free-form page + premise card + auto-title, graduation into projects; ids validated by jsonio; `save_content`/`rename`/`save_card` merge under a locked load-modify-write (`_modify`) so a racing save never clobbers fields it didn't see |
+| `ideas.py` | `IdeaStore` | Idea room store: free-form page + premise card + auto-title, graduation into projects; transfer reports premise/session outcomes, locks source reads and publishes without clobbering; ids validated by jsonio; `save_content`/`rename`/`save_card` merge under a locked load-modify-write (`_modify`) so a racing save never clobbers fields it didn't see |
 | `stt.py` | `transcribe`, `supported_languages`, `STTUnavailableError` | Local dictation (faster-whisper lazy import or localhost whisper server); never off-machine. The localhost check is `net_guard.is_loopback_url`, shared with the model-server guard |
 | `character_track.py` | `build_character_tracks` | Per-character presence/traits/interactions rail from KG + report |
 | `metrics.py` | `load`, `record_analysis`, `record_reply`, `record_findings` | Quiet local writing-loop metrics (status strip ⚡) |

@@ -99,7 +99,11 @@ class TestIdeaStore:
 
         project_dir = tmp_path / "proj"
         os.makedirs(project_dir, exist_ok=True)
-        store.carry_into_project(meta["id"], str(project_dir))
+        transfer = store.carry_into_project(meta["id"], str(project_dir))
+        assert transfer["complete"] is True
+        assert transfer["premise"]["status"] == "copied"
+        assert transfer["sessions"]["status"] == "complete"
+        assert transfer["sessions"]["copied"] == ["abc123"]
         assert os.path.exists(os.path.join(project_dir, "premise.json"))
         assert os.path.exists(os.path.join(project_dir, "sessions", "abc123.json"))
 

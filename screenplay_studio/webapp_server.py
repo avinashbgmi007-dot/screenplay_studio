@@ -2385,6 +2385,131 @@ def create_sample_project():
     return jsonify(_manifest_summary(manifest)), 201
 
 
+def _reject_sceneless_upload(manifest, project_dir: str):
+    """Use the same post-parse readiness rule for every project-import path."""
+    try:
+        from screenplay_parser.models import ScriptDocument
+        doc = ScriptDocument.load(manifest.parsed_path)
+    except Exception:
+        return None  # preserve the existing unreadable-parse handling
+    if doc.scenes:
+        return None
+    try:
+        retry_permission(lambda: shutil.rmtree(project_dir))
+    except OSError:
+        pass  # best effort; the truthful 400 still matters if cleanup is refused
+    return _error(
+        "This file contains no readable scenes (no scene headings like 'INT. ROOM - DAY'). "
+        "Nothing was added to your library — export the screenplay as Fountain or plain text "
+        "with scene headings and try again.",
+        400)
+
+
+def _graduation_path(project_dir: str) -> str:
+    return os.path.join(project_dir, "graduation.json")
+
+
+def _read_graduation(project_dir: str) -> dict | None:
+    path = _graduation_path(project_dir)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            record = json.load(f)
+        return record if isinstance(record, dict) else {
+            "status": "unknown", "complete": False,
+            "error": "Transfer status is unreadable; the original idea remains available."}
+    except Exception:
+        return {"status": "unknown", "complete": False,
+                "error": "Transfer status is unreadable; the original idea remains available."}
+
+
+def _pending_graduation(idea_id: str) -> dict:
+    return {
+        "idea_id": idea_id,
+        "status": "pending",
+        "complete": False,
+        "retryable": True,
+        "premise": {"status": "pending"},
+        "sessions": {"status": "pending", "expected": None,
+                     "copied": [], "already_present": [], "failed": []},
+        "session_pin": {"status": "pending"},
+        "updated_at": time.time(),
+    }
+
+
+def _unknown_graduation_transfer() -> dict:
+    return {
+        "complete": False,
+        "premise": {"status": "unknown"},
+        "sessions": {"status": "unknown", "expected": None,
+                     "copied": [], "already_present": [], "failed": []},
+        "session_pin": {"status": "unknown"},
+    }
+
+
+def _pin_graduated_session(manifest, project_dir: str, transfer: dict) -> dict:
+    sessions = transfer.get("sessions") or {}
+    if sessions.get("status") == "empty":
+        return {"status": "not_needed"}
+    if sessions.get("status") != "complete":
+        return {"status": "deferred",
+                "reason": "Conversation transfer is incomplete; no session was pinned."}
+    session_ids = sorted(set(sessions.get("copied", []))
+                         | set(sessions.get("already_present", [])))
+    if not session_ids:
+        return {"status": "not_needed"}
+    session_dir = os.path.join(project_dir, "sessions")
+    previous = manifest.cowriter_session_id
+    try:
+        latest = max(session_ids, key=lambda sid: os.path.getmtime(
+            os.path.join(session_dir, f"{sid}.json")))
+        if previous == latest:
+            return {"status": "already_pinned", "session_id": latest}
+        manifest.cowriter_session_id = latest
+        manifest.save()
+        return {"status": "pinned", "session_id": latest}
+    except Exception as exc:
+        manifest.cowriter_session_id = previous
+        print(f"[graduate] could not pin the carried conversation: {exc}")
+        return {"status": "failed", "reason": type(exc).__name__}
+
+
+def _carry_and_record_graduation(idea_id: str, manifest) -> dict:
+    """Retry components under one marker lock; same bytes are success, conflicts survive."""
+    path = _graduation_path(manifest.project_dir)
+    with lock_for(path):
+        with open(path, encoding="utf-8") as f:
+            record = json.load(f)
+        if not isinstance(record, dict) or record.get("idea_id") != idea_id:
+            raise ValueError("This project is not registered to graduate from that idea.")
+        try:
+            transfer = IdeaStore(_ideas_dir()).carry_into_project(
+                idea_id, manifest.project_dir)
+        except Exception as exc:
+            print(f"[graduate] transfer failed for {os.path.basename(manifest.project_dir)}: {exc}")
+            transfer = _unknown_graduation_transfer()
+            transfer["error"] = "The transfer could not be completed; the original idea remains available."
+        transfer["session_pin"] = _pin_graduated_session(
+            manifest, manifest.project_dir, transfer)
+        transfer["complete"] = bool(
+            transfer.get("premise", {}).get("status") in ("copied", "already_present")
+            and transfer.get("sessions", {}).get("status") in ("complete", "empty")
+            and transfer.get("session_pin", {}).get("status")
+            in ("pinned", "already_pinned", "not_needed"))
+        record.update(transfer)
+        record["status"] = "complete" if transfer["complete"] else "partial"
+        record["updated_at"] = time.time()
+        try:
+            atomic_write_json(path, record)
+        except Exception as exc:
+            print(f"[graduate] could not record transfer status: {exc}")
+            record["complete"] = False
+            record["status"] = "unknown"
+            record["error"] = "Transfer status could not be saved; the original idea remains available."
+        return record
+
+
 @app.route("/api/projects", methods=["POST"])
 def create_project():
     if "file" not in request.files:
@@ -2432,33 +2557,12 @@ def create_project():
     except Exception as e:
         return _error(f"Could not process uploaded file: {e}", 500)
 
-    # R5 (audit M3), the scene-less case: the parser also "succeeds" on a
-    # prose file with no scene headings, so the project USED to be created
-    # (201) and the failure only surfaced minutes later as an analyze 502
-    # ("Document has no parsed scenes") — after the writer had left the
-    # desk believing the import worked. The parse stage records the truth;
-    # read it back here, reject with actionable guidance, and REMOVE the
-    # claimed directory so the shelf never lists a project that cannot be
-    # analyzed. (The write of parsed.json is the same file run_parse just
-    # finished — no sharing violation is expected; the bounded retry covers
-    # a stray Windows handle as elsewhere in this file.)
-    try:
-        from screenplay_parser.models import ScriptDocument
-        doc = ScriptDocument.load(manifest.parsed_path)
-        sceneless = not doc.scenes
-    except Exception:
-        sceneless = False  # unreadable parse output keeps the OLD behavior: a 201 whose analyze fails loudly
-    if sceneless:
-        import shutil
-        try:
-            retry_permission(lambda: shutil.rmtree(project_dir))
-        except OSError:
-            pass  # worst case: one half-claimed dir lingers; the 400 is what matters
-        return _error(
-            "This file contains no readable scenes (no scene headings like 'INT. ROOM - DAY'). "
-            "Nothing was added to your library — export the screenplay as Fountain or plain text "
-            "with scene headings and try again.",
-            400)
+    # The ordinary import and idea-graduation routes share the same truthful
+    # post-parse readiness check. A syntactically successful parse with no scenes
+    # is not a usable project.
+    rejected = _reject_sceneless_upload(manifest, project_dir)
+    if rejected is not None:
+        return rejected
 
     return jsonify(_manifest_summary(manifest)), 201
 
@@ -2470,6 +2574,9 @@ def get_project(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     data = _manifest_summary(m)
+    graduation = _read_graduation(m.project_dir)
+    if graduation is not None:
+        data["graduation"] = graduation
     # Gap 31: explicit, local preview of exactly what the cross-project shelf
     # digest can add to a prompt. This is returned only on request; it is not
     # sent to a model, and lets the writer see the actual titles/cast/themes
@@ -6626,8 +6733,12 @@ def graduate_idea(idea_id):
     # title answered 400 and could not be done at all. Same fold as the other
     # two create paths.
     safe_name = safe_dir_name(title)
-    # Same gate as create_project, before the claim (see above): a rejected
-    # graduation must not leave a claimed directory behind.
+    # Match ordinary project import: reject zero-byte data before claiming a
+    # directory, then apply the shared post-parse scene-readiness gate below.
+    upload.seek(0, os.SEEK_END)
+    if upload.tell() == 0:
+        return _error("The uploaded file is empty (0 bytes). Choose the screenplay file you meant to import.", 400)
+    upload.seek(0)
     ext = _supported_upload_ext(upload.filename)
     if ext is None:
         return _unsupported_ext_error(upload.filename)
@@ -6645,30 +6756,51 @@ def graduate_idea(idea_id):
     except Exception as e:
         return _error(f"Could not process uploaded file: {e}", 500)
 
-    try:
-        IdeaStore(_ideas_dir()).carry_into_project(idea_id, project_dir)
-    except Exception as e:
-        # Never blocks graduation — the pages are the point — but it must not be
-        # SILENT either: the writer would find the idea's conversation simply
-        # absent and have no way to tell that from "there was nothing to carry".
-        print(f"[graduate] could not carry the idea's conversation into "
-              f"{os.path.basename(project_dir)}: {e}")
+    rejected = _reject_sceneless_upload(manifest, project_dir)
+    if rejected is not None:
+        # The source idea is not touched; only this unusable new project is removed.
+        return rejected
 
-    # pin the carried conversation so the script desk opens on the same thread
+    marker = _pending_graduation(idea_id)
     try:
-        sessions = sorted(
-            fn for fn in os.listdir(os.path.join(project_dir, "sessions")) if fn.endswith(".json")
-        )
-        if sessions:
-            latest = max(sessions, key=lambda fn: os.path.getmtime(os.path.join(project_dir, "sessions", fn)))
-            manifest.cowriter_session_id = os.path.splitext(latest)[0]
-            manifest.save()
+        atomic_write_json(_graduation_path(project_dir), marker)
+        graduation = _carry_and_record_graduation(idea_id, manifest)
     except Exception as e:
-        # Same rule as the carry above: harmless, but not silent — the desk would
-        # just open on a fresh thread with no explanation.
-        print(f"[graduate] could not pin the carried conversation: {e}")
+        # Pages are already a valid project. Keep them, but never claim that the
+        # optional idea material arrived; the original idea remains recoverable.
+        print(f"[graduate] could not initialize transfer for {os.path.basename(project_dir)}: {e}")
+        graduation = _unknown_graduation_transfer()
+        graduation.update({"idea_id": idea_id, "status": "unknown", "retryable": False,
+                           "error": "Transfer status could not be initialized; the original idea remains available."})
 
-    return jsonify(_manifest_summary(manifest)), 201
+    response = _manifest_summary(manifest)
+    response["graduation"] = graduation
+    return jsonify(response), 201
+
+
+@app.route("/api/projects/<name>/retry-graduation-transfer", methods=["POST"])
+def retry_graduation_transfer(name):
+    """Idempotently retry idea materials into the already-created project."""
+    try:
+        manifest = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    readiness_error = _unread_parse_reason(manifest)
+    if readiness_error:
+        return _error(readiness_error, 400)
+    current = _read_graduation(manifest.project_dir)
+    if not isinstance(current, dict) or not current.get("idea_id"):
+        return _error("This project has no recorded idea transfer to retry.", 409)
+    try:
+        _load_idea(current["idea_id"])
+        graduation = _carry_and_record_graduation(current["idea_id"], manifest)
+    except FileNotFoundError:
+        return _error("The original idea is no longer available, so its transfer cannot be retried.", 409)
+    except (ValueError, json.JSONDecodeError) as e:
+        return _error(f"The transfer record cannot be used safely: {e}", 409)
+    response = _manifest_summary(manifest)
+    response["graduation"] = graduation
+    return jsonify(response), 200
 
 
 def _startup_token(no_token: bool):
