@@ -76,3 +76,12 @@ disputed.
 `.git`, so a fresh clone is still ~19 MB of history; the working tree and every
 future checkout are 33% smaller. Rewriting history on a shared branch would
 change every commit SHA and is the branch owner's call, not mine.
+
+### Gap 130 disposition (2026-11-02)
+
+The three duplicate groups above were replaced with distinct demo-watermarked
+captures after the UI state was driven and checked. See
+`docs/audit/evidence-2026-09-30/README.md` § “Gap 130” for the journey and
+limitations, and `docs/audit/gap130-demo-captures.json` for per-file provenance
+and hashes. Historical blobs remain in git history; no history rewrite or
+unrelated screenshot deletion was performed.

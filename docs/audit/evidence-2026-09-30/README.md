@@ -281,3 +281,40 @@ capability token) via `tests/e2e_browser_common.py` and tears it down.
 - [observed, by-design] Desk toolbar is auto-hiding chrome; Run Analysis
   discoverability for a first-time writer — logged for Report 2.
 - All demo-model-dependent claims are labeled; no real-llama-server claims made.
+
+## Gap 130 — corrected, explicitly disclosed demo frames
+
+The previously byte-identical files were replaced on 2026-11-02 with seven
+separate captures of the running app. Every image carries a visible `DEMO`
+watermark plus PNG provenance text; no image is presented as original Gun-Pen
+material or as a real-model result. `A-scene_function.png` is the one disclosed
+browser-only seeded UI example, not a server finding. The other six states are
+backed by the built-in demo-model payloads or the four-scene Loop Script audit
+fixture. They are illustrative UI evidence, not claim of original-source
+results.
+
+The capture journey is `scripts/gap130_demo_capture.py`; it uses
+`tests/fixtures/pain_tenglish.fountain` and drives the app through its HTTP API
+and real SPA renderers. Run from the repository root in an environment with
+the test requirements and a Playwright Chromium browser installed:
+
+```sh
+.venv/bin/python docs/audit/evidence-2026-09-30/scripts/gap130_demo_capture.py --out /tmp/gap130-candidates
+```
+
+The run asserts the seeded finding/dial/coverage payloads; visible Scene
+Function card bounds; at least two character-dial rows; coverage logline and
+frame; and disclosure sections in the Evidence lens. The full-lens frame uses a 1440×2600 viewport so the independently scrolling Evidence dock exposes its expanded sections together; the entire very tall script is not the subject of that image. The J4 journey asserts
+`AUDITED` in saved Fountain and rendered content, board order `[2, 1, 3, 4]`
+against Fountain export, and active `draft-1` with its v2 dialogue. The capture
+manifest, fixture, browser versions, hashes, dimensions, and promoted paths are
+recorded in `docs/audit/gap130-demo-captures.json`. Re-running can change hashes because
+small live desk timer/UI values are captured; the manifest fingerprints the
+promoted snapshot only. This manifest is provenance, not a substitute for the visible watermark or the assertions.
+
+All seven images were visually reviewed at native resolution after capture.
+The Scene Function card is fully within the viewport; the tall Evidence-lens
+frame shows the coverage, setup/payoff, deterministic formatting, pacing,
+characters, and character-dials sections. `tests/test_gap130_evidence_integrity.py`
+pins distinct image hashes and embedded demo disclosure for each formerly
+colliding group; it does not claim to infer semantic state from image hashes.
