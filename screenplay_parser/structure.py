@@ -59,36 +59,58 @@ def estimate_scene_pages(doc: ScriptDocument) -> dict:
 
 
 def assign_acts(doc: ScriptDocument, pages: dict | None = None) -> list[dict]:
-    """Bucket scenes into acts by page position. Returns a list of act dicts:
-    {act: int, name: str, scene_numbers: [..], page_start, page_end}."""
+    """Estimate three-act ranges from relative scene page positions.
+
+    Page positions may be absolute parser pages or fractional text estimates.
+    Incomplete caller-supplied maps are discarded in favor of a complete map
+    from the document, so unknown positions are never mixed with a magic page
+    number. Normalize against the observed span so absolute and proxy positions
+    use the same proportional boundaries.
+    Only populated ranges are returned; the numeric act id is an estimate, not
+    an authored act break.
+    """
     if not doc.scenes:
         return []
-    pages = pages or estimate_scene_pages(doc)
-    total = max(pages.values()) or 1.0
-    act_1_end = ACT_1_END * total
-    act_2_end = ACT_2_END * total
+    supplied_pages = pages is not None and all(
+        scene.scene_number in pages and pages[scene.scene_number] is not None
+        for scene in doc.scenes
+    )
+    if not supplied_pages:
+        pages = estimate_scene_pages(doc)
+    page_basis = "source_page_positions" if supplied_pages or all(
+        scene.page_start is not None and scene.page_end is not None
+        for scene in doc.scenes
+    ) else "content_estimate"
+    positions = {
+        scene.scene_number: float(pages[scene.scene_number])
+        for scene in doc.scenes
+    }
+    first = min(positions.values())
+    last = max(positions.values())
+    span = last - first
 
-    acts = [
-        {"act": 1, "name": "Act 1", "scene_numbers": [], "page_start": 1.0, "page_end": None},
-        {"act": 2, "name": "Act 2", "scene_numbers": [], "page_start": None, "page_end": None},
-        {"act": 3, "name": "Act 3", "scene_numbers": [], "page_start": None, "page_end": None},
-    ]
+    buckets = {1: [], 2: [], 3: []}
     for scene in doc.scenes:
-        pos = pages.get(scene.scene_number, 1.0)
-        idx = 0 if pos <= act_1_end else (1 if pos <= act_2_end else 2)
-        acts[idx]["scene_numbers"].append(scene.scene_number)
-        if acts[idx]["page_start"] is None or pos < acts[idx]["page_start"]:
-            acts[idx]["page_start"] = pos
-        acts[idx]["page_end"] = pos
+        pos = positions[scene.scene_number]
+        progress = (pos - first) / span if span > 0 else 0.0
+        act = 1 if progress <= ACT_1_END else (2 if progress <= ACT_2_END else 3)
+        buckets[act].append(scene.scene_number)
 
-    for a in acts:
-        if a["scene_numbers"]:
-            a["page_start"] = round(a["page_start"], 1)
-            a["page_end"] = round(a["page_end"], 1)
-        else:
-            a["page_start"] = None
-            a["page_end"] = None
-        a["scene_count"] = len(a["scene_numbers"])
+    acts = []
+    for act_number, scene_numbers in buckets.items():
+        if not scene_numbers:
+            continue
+        act_positions = [positions[number] for number in scene_numbers]
+        acts.append({
+            "act": act_number,
+            "name": f"Estimated Act {act_number}",
+            "scene_numbers": scene_numbers,
+            "page_start": round(min(act_positions), 2),
+            "page_end": round(max(act_positions), 2),
+            "scene_count": len(scene_numbers),
+            "estimated": True,
+            "position_basis": page_basis,
+        })
     return acts
 
 

@@ -470,13 +470,24 @@ def render_markdown(result: AnalysisResult) -> str:
     acts = st.get("acts") or []
     if acts:
         lines.append("## Structure at a Glance")
-        lines.append("### Acts")
+        lines.append("### Estimated act ranges")
+        lines.append(
+            "*These proportional groupings are inferred from scene positions; "
+            "act breaks are not marked in this parse.*")
         for a in acts:
-            pages = f"pp. {a['page_start']}–{a['page_end']}" if a["page_start"] else ""
-            if not a["scene_numbers"]:
-                lines.append(f"**{a['name']}** (no scenes in this range)")
+            scene_numbers = a.get("scene_numbers") or []
+            if not scene_numbers:
                 continue
-            lines.append(f"**{a['name']}** ({a['scene_count']} scenes, {pages}): Scenes {a['scene_numbers'][0]}–{a['scene_numbers'][-1]}")
+            if a.get("position_basis") != "source_page_positions":
+                bounds = (f"estimated positions {a['page_start']}–{a['page_end']}"
+                          if a.get("page_start") is not None else "")
+            else:
+                bounds = (f"pp. {a['page_start']}–{a['page_end']}"
+                          if a.get("page_start") is not None else "")
+            bounds_text = f", {bounds}" if bounds else ""
+            lines.append(
+                f"**{a['name']}** ({a['scene_count']} scenes{bounds_text}): "
+                f"Scenes {scene_numbers[0]}–{scene_numbers[-1]}")
         lines.append("")
         pacing = st.get("pacing") or {}
         segments = pacing.get("segments", [])

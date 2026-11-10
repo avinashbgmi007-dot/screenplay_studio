@@ -261,6 +261,7 @@ class TestFindingsSummary:
         # it moves WITH the contract rather than being relaxed to fit.
         assert set(data["by_status"]) == {"addressed", "still_present", "changed", "unknown"}
         assert data["acts"] and {"act", "name", "scene_count"} <= set(data["acts"][0])
+        assert all(act["name"].startswith("Estimated Act ") for act in data["acts"])
 
     def test_writer_intent_moves_done_and_dawn(self, http_client):
         project = _analyzed(http_client)

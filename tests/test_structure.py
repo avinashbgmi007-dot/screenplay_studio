@@ -20,13 +20,13 @@ class TestActs:
         nums = [n for a in acts for n in a["scene_numbers"]]
         assert nums == sorted(nums) == [s.scene_number for s in doc.scenes]
 
-    def test_short_script_all_in_act_one(self, sample_fountain):
+    def test_short_script_returns_only_populated_estimated_acts(self, sample_fountain):
         doc = _doc(sample_fountain)
         acts = assign_acts(doc)
-        # 3-scene sample is short; the first act boundary (25% of ~1 page)
-        # means everything lands in Act 1 — but all acts must still exist
-        assert len(acts) == 3
+        assert acts
+        assert all(a["scene_count"] > 0 for a in acts)
         assert sum(a["scene_count"] for a in acts) == doc.scene_count
+        assert all(a["estimated"] for a in acts)
 
     def test_act_for_scene(self, sample_fountain):
         doc = _doc(sample_fountain)
