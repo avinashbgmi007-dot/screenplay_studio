@@ -13,12 +13,11 @@ context is too small for the model passes.
        scene marked CONTINUOUS (or carrying a time-skip marker) clears its
        boundary.
 
-    2. Character-name variants. The same person spelled two ways in cues
-       ("SIDDHARTH" in some scenes, "SIDDHU" in others) splits into two
-       characters in the parse, which quietly corrupts scene presence,
-       arcs, and the KG. If two canonical characters look like spelling
-       variants (edit distance <= 2, or one a short prefix of the other),
-       never appear in the same scene, and both speak, flag them.
+    2. Possible character-name typos. Similar cue names that never share a
+       scene may be one person spelled two ways, but string similarity cannot
+       prove identity. Only tight spelling differences between sufficiently
+       long cues are surfaced, as a low-severity question; names are never
+       merged automatically.
 
 Both return (findings, errors) with errors always empty. Findings use the
 standard schema (category/issue/why_it_matters/severity/scene_refs/
@@ -183,15 +182,25 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
+_MIN_VARIANT_NAME_LENGTH = 6
+_MAX_VARIANT_EDIT_FRACTION = 0.13
+
+
 def _looks_like_variant(a: str, b: str) -> bool:
+    """Candidate only for a tight typo in a long cue; never infer nicknames.
+
+    Two edits and the old prefix shortcut admitted distinct role labels such as
+    MOTHER/BROTHER. The limit is a fraction of the longer name so one likely
+    typo survives for long names while short/common labels need stronger
+    evidence than string shape can provide.
+    """
     a, b = a.upper(), b.upper()
     if a == b:
         return False
-    if _levenshtein(a, b) <= 2:
-        return True
-    # one a short prefix of the other (SIDDHU / SIDDHARTH)
-    short, long_ = (a, b) if len(a) <= len(b) else (b, a)
-    return len(short) >= 4 and long_.startswith(short) and len(long_) - len(short) <= 3
+    longest = max(len(a), len(b))
+    if longest < _MIN_VARIANT_NAME_LENGTH:
+        return False
+    return _levenshtein(a, b) / longest <= _MAX_VARIANT_EDIT_FRACTION
 
 
 def _name_variant_findings(doc: ScriptDocument, by_char: dict) -> list[dict]:
@@ -219,14 +228,13 @@ def _name_variant_findings(doc: ScriptDocument, by_char: dict) -> list[dict]:
             findings.append({
                 "category": CATEGORY,
                 "issue": (
-                    f"'{a}' and '{b}' look like two spellings of the same character "
-                    f"(they never appear together). If so, one cue spelling is wrong — "
-                    f"the parse sees two people where the script has one."
+                    f"'{a}' and '{b}' are similar cue names and never appear together. "
+                    f"Could they be one character with a spelling difference?"
                 ),
                 "why_it_matters": (
-                    "A split character quietly corrupts scene presence, arcs, and the "
-                    "knowledge graph — the analysis judges a person who doesn't exist "
-                    "as two strangers who never meet."
+                    "If these cues are intended to name one person, the parse keeps "
+                    "them separate, which can split scene presence and character arcs. "
+                    "Only the writer can confirm that identity."
                 ),
                 "severity": "low",
                 "scene_refs": sorted(a_scenes | b_scenes)[:6],
