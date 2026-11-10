@@ -1,4 +1,5 @@
-"""Gap 98 — a writer who said what they want must not be interrogated.
+"""Gap 98 (also closes Gap 14's deterministic classifier claim): a writer who
+said what they want must not be interrogated.
 
 Filed defect: `classify_turn` keyed on the first token and a trailing "?" only,
 so two opposite failures came out of one rule:
@@ -140,6 +141,44 @@ def test_intent_forbids_the_interrogation_explicitly():
     contract = opening_contract("intent").lower()
     assert "already said" in contract
     assert "do not ask what is driving it" in contract
+
+
+@pytest.mark.parametrize(("text", "contract_marker"), [
+    ("I want the audience to feel compulsion.", "THE WRITER HAS DECIDED"),
+    ("Could I lose the last beat?", "REQUEST FIRST"),
+])
+def test_intent_and_request_use_production_engine_path_without_a_probe(
+        text, contract_marker):
+    """Pin deterministic dispatch for both filed cases through the turn path.
+
+    A fake transport lets us inspect the exact prompt and number of model calls;
+    it does not claim a real model will obey the contract in its reply.
+    """
+    from screenplay_cowriter.context import ReportContext, ScriptContext
+    from screenplay_cowriter.engine import CoWriterEngine
+    from screenplay_cowriter.models import Session
+
+    class CaptureClient:
+        def __init__(self):
+            self.calls = []
+
+        def chat(self, messages, **_kwargs):
+            self.calls.append(messages)
+            return "I'll treat that as the goal and shape the scene toward it."
+
+    client = CaptureClient()
+    engine = CoWriterEngine(client, ScriptContext({}), ReportContext(None))
+    session = Session.new(title="intent test")
+    engine.send_message(session, text)
+
+    assert len(client.calls) == 1, "intent and request turns must not take the probe-then-answer path"
+    assert session.branch.awaiting_probe is False
+    system = " ".join(m["content"] for m in client.calls[0]
+                       if m["role"] == "system")
+    assert contract_marker in system
+    if contract_marker == "THE WRITER HAS DECIDED":
+        assert "do not ask what is driving it" in system.lower()
+    assert "ONE job" not in system
 
 
 def test_request_is_not_treated_as_a_fact_question():
