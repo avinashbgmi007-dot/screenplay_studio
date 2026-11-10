@@ -144,6 +144,38 @@ class TestPublicationIsOnePointerSwap:
             "a reading that predates the failed attempt must say so")
         assert body["snapshot"]["digest"] == good["snapshot"]["digest"]
 
+        queue = client.get(f"/api/projects/{project}/fixqueue")
+        findings = client.get(f"/api/projects/{project}/findings")
+        summary = client.get(f"/api/projects/{project}/findings/summary")
+        assert queue.status_code == findings.status_code == summary.status_code == 200
+        queue_body, findings_body, summary_body = (
+            queue.get_json(), findings.get_json(), summary.get_json())
+        for payload in (queue_body, findings_body, summary_body):
+            assert payload["published"]["generation"] == body["published"]["generation"]
+            assert payload["published"]["is_stale"] is True
+        queue_ids = [item["finding_id"] for item in queue_body["items"]]
+        assert queue_ids == [item["finding_id"] for item in findings_body["items"]]
+        assert summary_body["total_count"] == len(queue_ids)
+
+    def test_failed_run_does_not_serve_a_reading_for_an_edited_draft(self, client, monkeypatch):
+        project = _project(client)
+        assert client.post(f"/api/projects/{project}/analyze", json={}).status_code == 200
+        assert client.post(f"/api/projects/{project}/edits/apply",
+                           json={"scene_number": 1, "replacements": [EDITED_LINE]}).status_code == 200
+
+        def total_failure(doc, llm, **kw):
+            result = AnalysisResult(doc)
+            result.errors = ["model unreachable for the whole run"]
+            result.coverage = None
+            return result
+
+        monkeypatch.setattr(pipeline, "analyze", total_failure)
+        assert client.post(f"/api/projects/{project}/analyze",
+                           json={"force": True}).status_code == 502
+        for route in ("report", "fixqueue", "findings", "findings/summary"):
+            response = client.get(f"/api/projects/{project}/{route}")
+            assert response.status_code == 400, route
+
     def test_a_staged_generation_carries_its_own_manifest(self, client):
         project = _project(client)
         client.post(f"/api/projects/{project}/analyze", json={})

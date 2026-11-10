@@ -3530,6 +3530,34 @@ def reparse_project(name):
     return jsonify(_manifest_summary(m))
 
 
+def _published_reading_state(m: ProjectManifest) -> tuple[dict | None, str | None]:
+    """Return the last published reading only when it still describes the draft.
+
+    A failed/in-flight analysis does not erase a last-good generation. Its
+    immutable generation digest is compared with the current working document
+    before another surface is allowed to keep showing that reading.
+    """
+    from .report_generation import current_generation
+    from screenplay_analyzer.report import document_digest
+
+    published = current_generation(m)
+    if published is None:
+        return None, None
+    is_stale = m.stage("analyze").status != "complete"
+    if is_stale:
+        try:
+            from .revision import load_working
+            live_digest = document_digest(load_working(m))
+        except Exception:  # noqa: BLE001 - match /report's cautious read behavior
+            live_digest = None
+        if live_digest is not None and published.get("digest") != live_digest:
+            return None, (
+                "This project has changed since its last completed analysis, so "
+                "that report no longer describes the script on screen. Run "
+                "Analysis again to get a reading of the current draft.")
+    return {**published, "is_stale": is_stale}, None
+
+
 @app.route("/api/projects/<name>/report", methods=["GET"])
 def get_report(name):
     try:
@@ -3548,25 +3576,14 @@ def get_report(name):
     # (the pre-existing `test_reparse_then_analyze_regenerates_report` pins
     # that). So the test is the DIGEST: serve the published generation only
     # while it still hashes to the script on screen.
-    from .report_generation import current_generation
-    from screenplay_analyzer.report import document_digest
     try:
-        published = current_generation(m)
+        published, publication_error = _published_reading_state(m)
     except ValueError as e:
         return _error(str(e), 500)
-    if m.stage("analyze").status != "complete":
-        if published is None:
-            return _error("Analysis hasn't completed for this project yet.", 400)
-        try:
-            from .revision import load_working
-            live_digest = document_digest(load_working(m))
-        except Exception:                                    # noqa: BLE001
-            live_digest = None
-        if live_digest is not None and published.get("digest") != live_digest:
-            return _error(
-                "This project has changed since its last completed analysis, so "
-                "that report no longer describes the script on screen. Run "
-                "Analysis again to get a reading of the current draft.", 400)
+    if publication_error:
+        return _error(publication_error, 400)
+    if m.stage("analyze").status != "complete" and published is None:
+        return _error("Analysis hasn't completed for this project yet.", 400)
     try:
         report = _load_report_sanitized(m)
     except FileNotFoundError:
@@ -3584,10 +3601,6 @@ def get_report(name):
                       "Analysis to produce one.", 404)
     if published is not None:
         report["published"] = published
-        # The honest label: this reading is still here, and it is not from the
-        # last attempt. A reader must not mistake "I can see findings" for "the
-        # run you just started succeeded".
-        report["published"]["is_stale"] = m.stage("analyze").status != "complete"
     return jsonify(report)
 
 
@@ -4321,10 +4334,19 @@ def get_fixqueue(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    if m.stage("analyze").status != "complete":
+    try:
+        published, publication_error = _published_reading_state(m)
+    except ValueError as e:
+        return _error(str(e), 500)
+    if publication_error:
+        return _error(publication_error, 400)
+    if m.stage("analyze").status != "complete" and published is None:
         return jsonify({"items": [], "acts": []})
     try:
-        return jsonify(_build_fixqueue(m))
+        queue = _build_fixqueue(m)
+        if published is not None:
+            queue["published"] = published
+        return jsonify(queue)
     except FileNotFoundError:
         # Same contradiction as /report: analyze claims complete, the findings
         # are gone. The honest answer is not `{"items": []}`, which means
@@ -4444,7 +4466,13 @@ def _findings_error(m) -> dict | None:
     analysis yet is a 400 by the /report contract; analyze-complete-with-no-
     file is a 404 by the /report contract (the answer can never be an empty
     list — that reads as "analysed, nothing to fix")."""
-    if m.stage("analyze").status != "complete":
+    try:
+        published, publication_error = _published_reading_state(m)
+    except ValueError as e:
+        return _error(str(e), 500)
+    if publication_error:
+        return _error(publication_error, 400)
+    if m.stage("analyze").status != "complete" and published is None:
         return _error("Analysis hasn't completed for this project yet.", 400)
     try:
         _load_report_sanitized(m)
@@ -4475,6 +4503,12 @@ def get_findings_summary(name):
     early = _findings_error(m)
     if early:
         return early
+    try:
+        published, publication_error = _published_reading_state(m)
+    except ValueError as e:
+        return _error(str(e), 500)
+    if publication_error:
+        return _error(publication_error, 400)
 
     from .revision import finding_statuses, finding_intents
     items, acts = _fixqueue_items(m)
@@ -4539,6 +4573,7 @@ def get_findings_summary(name):
         "by_category": by_category,
         "by_status": by_status,
         "verification": served_report.get("verification_summary") or {},
+        "published": published,
         "summary": statuses.get("summary") or {},
         "acts": [{"act": a["act"], "name": a["name"], "scene_count": len(a.get("scenes") or [])}
                  for a in acts],
@@ -4566,6 +4601,12 @@ def get_findings(name):
     if early:
         return early
 
+    try:
+        published, publication_error = _published_reading_state(m)
+    except ValueError as e:
+        return _error(str(e), 500)
+    if publication_error:
+        return _error(publication_error, 400)
     items, _acts = _fixqueue_items(m)
     include_dismissed = request.args.get("include_dismissed") == "1"
     if not include_dismissed:
@@ -4597,8 +4638,8 @@ def get_findings(name):
                 "members": rows,
             }
             for issue, rows in groups.items()
-        ]})
-    return jsonify({"items": items, "count": len(items)})
+        ], "published": published})
+    return jsonify({"items": items, "count": len(items), "published": published})
 
 
 @app.route("/api/projects/<name>/findings/intent/batch", methods=["POST"])

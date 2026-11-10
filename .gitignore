@@ -123,3 +123,6 @@ Cursors/
 # keeps a future graphify run from recreating the problem invisibly.
 graph.json
 graph_output.json
+
+# Local Python virtual environments
+.venv/
