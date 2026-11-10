@@ -531,9 +531,17 @@ def verdict_accuracy(m) -> dict:
     if not isinstance(report, dict):
         return empty
     report = annotate_report_scene_keys(m, report)
+    # The desk and /report exclude non-writing feedback at serve time. Keep the
+    # accuracy meter on that same published population: otherwise a verdict on
+    # a row the writer cannot see changes the API's total, coverage, and rate,
+    # while the SPA's meter (computed from its visible rows) reports a different
+    # number. Keep the stored verdict itself; only the current metric population
+    # is filtered.
+    from screenplay_analyzer.feedback_filter import filter_findings
+    findings = filter_findings(report.get("findings") or [])
     verdicts = finding_verdicts(m)      # damaged -> raises through to the route
     seen: dict = {}                     # id -> category, first occurrence wins
-    for f in report.get("findings") or []:
+    for f in findings:
         if not isinstance(f, dict):
             continue
         fid = compute_finding_id(f)

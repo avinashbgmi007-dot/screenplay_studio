@@ -236,6 +236,37 @@ def test_accuracy_route_serves_the_meter(served):
     assert body["verifiability"]["verified"] == 0
 
 
+def test_accuracy_counts_the_same_filtered_rows_the_desk_serves(served):
+    """A stored, already-judged meta note is not in the served report and must
+    not move accuracy, coverage, or verifiability for the rows the writer sees."""
+    client, m = served
+    kept = _finding(17)
+    kept["issue"] = "The exchange repeats the same emotional beat."
+    filtered = _finding(18)
+    filtered["issue"] = "Reads as a regional dialect."
+    with open(m.report_findings_path, "w", encoding="utf-8") as f:
+        json.dump({"findings": [kept, filtered]}, f)
+
+    # Confirm this is the actual serve-time predicate, then mark the visible row
+    # correct and the hidden one incorrect to make the population error obvious.
+    from screenplay_analyzer.feedback_filter import filter_findings
+    assert filter_findings([kept, filtered]) == [kept]
+    revision.set_finding_verdict(m, revision.compute_finding_id(kept), "correct")
+    revision.set_finding_verdict(m, revision.compute_finding_id(filtered), "incorrect")
+
+    import screenplay_studio.webapp_server as webapp_server
+    served_rows = webapp_server._load_report_sanitized(m)["findings"]
+    assert len(served_rows) == 1
+
+    body = client.get("/api/projects/p1/findings/accuracy").json
+    assert body["total"] == 1 and body["judged"] == 1, body
+    assert body["tally"] == {"correct": 1, "partial": 0,
+                             "incorrect": 0, "unjudged": 0}
+    assert body["accuracy"] == 100.0 and body["coverage"] == 100.0
+    assert body["verifiability"]["quote_bearing"] == sum(
+        bool((row.get("evidence_quote") or "").strip()) for row in served_rows)
+
+
 # ---------- 5. id survival (gate 3), measured not assumed ----------
 
 def test_verdict_survives_reanalysis_by_id_not_by_position(project):
