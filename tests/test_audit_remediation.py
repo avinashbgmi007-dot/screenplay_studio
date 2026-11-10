@@ -263,6 +263,25 @@ class TestFindingsSummary:
         assert data["acts"] and {"act", "name", "scene_count"} <= set(data["acts"][0])
         assert all(act["name"].startswith("Estimated Act ") for act in data["acts"])
 
+    def test_one_scene_act_summary_reports_its_populated_scene_count(self, http_client):
+        script = b"INT. ROOM - NIGHT\n\nMARA\nHello.\n"
+        uploaded = http_client.post(
+            "/api/projects",
+            data={"file": (io.BytesIO(script), "one_scene.fountain"), "title": "One Scene"},
+            content_type="multipart/form-data",
+        )
+        assert uploaded.status_code in (200, 201), uploaded.get_data(as_text=True)
+        project = uploaded.get_json()["project"]
+        analyzed = http_client.post(f"/api/projects/{project}/analyze", json={})
+        assert analyzed.status_code == 200, analyzed.get_data(as_text=True)
+        parsed = http_client.get(f"/api/projects/{project}/script").get_json()
+        assert parsed["scene_count"] == 1
+
+        summary = http_client.get(f"/api/projects/{project}/findings/summary").get_json()
+        assert len(summary["acts"]) == 1
+        assert summary["acts"][0]["scene_count"] == 1
+        assert sum(act["scene_count"] for act in summary["acts"]) == 1
+
     def test_writer_intent_moves_done_and_dawn(self, http_client):
         project = _analyzed(http_client)
         before = http_client.get(f"/api/projects/{project}/findings/summary").get_json()

@@ -4575,7 +4575,7 @@ def get_findings_summary(name):
         "verification": served_report.get("verification_summary") or {},
         "published": published,
         "summary": statuses.get("summary") or {},
-        "acts": [{"act": a["act"], "name": a["name"], "scene_count": len(a.get("scenes") or [])}
+        "acts": [{"act": a["act"], "name": a["name"], "scene_count": len(a["scene_numbers"])}
                  for a in acts],
     })
 
