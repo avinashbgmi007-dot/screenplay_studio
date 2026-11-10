@@ -63,6 +63,26 @@ _INTENT_STATEMENT = re.compile(
 _REQUEST_START = re.compile(
     r"^(can|could|would|will|should|may|might)\s+(we|i|you)\b", re.I)
 
+# A second-person modal can be a courteous command or a request for information,
+# not only a proposal. Keep these lists deliberately small: unknown forms retain
+# the existing generic request behavior instead of being guessed as an edit.
+_POLITE_INFORMATION_START = re.compile(
+    r"^(?:can|could|would|will)\s+you\s+(?:please\s+)?"
+    r"(?:explain|tell|describe|clarify|summarize|remind)\b", re.I)
+_POLITE_DIRECTIVE_START = re.compile(
+    r"^(?:can|could|would|will)\s+you\s+(?:please\s+)?"
+    r"(?:rewrite|revise|tighten|trim|shorten|expand|fix|change|try|add|cut|"
+    r"move|remove|make|write|draft|replace|polish|rework)\b", re.I)
+
+# `since` can be causal (`... since the audience knows`) or temporal
+# (`Since the funeral, ...`). Exempt only a leading, comma-terminated clause
+# with an explicit time/event noun; do not pretend to parse arbitrary prose.
+_TEMPORAL_SINCE_PREFIX = re.compile(
+    r"^\s*since\s+(?:(?:the|last|this)\s+)?"
+    r"(?:funeral|wedding|accident|night|morning|afternoon|evening|day|week|"
+    r"month|year|summer|winter|spring|autumn|fall|childhood|birth|then)"
+    r"\b[^,.;!?]*,\s*", re.I)
+
 PROBE_SYSTEM_PROMPT = (
     "You are Sameer, the writer's co-writing partner. The writer just shared an idea with "
     "you. This turn has ONE job: let them feel heard — reflect their idea back in your "
@@ -92,6 +112,10 @@ def classify_turn(text: str) -> str:
     t = (text or "").strip()
     if not t:
         return "idea"
+    if _POLITE_INFORMATION_START.match(t):
+        return "question"
+    if _POLITE_DIRECTIVE_START.match(t):
+        return "directive"
     if _REQUEST_START.match(t):
         return "request"
     if t.endswith("?") or _QUESTION_START.match(t):
@@ -136,8 +160,14 @@ def opening_contract(turn_kind: str) -> str:
 def has_embedded_reasoning(text: str) -> bool:
     """True when the writer gave their own reasoning ('because', 'since', 'my
     instinct', ...) — a real co-writer doesn't interrogate a thought the writer
-    has already justified."""
-    return bool(_REASONING.search(text or ""))
+    has already justified.
+
+    A small, comma-terminated temporal `Since <event/time>, ...` opener is
+    removed first: that fact can be scene context rather than a reason for a
+    later idea. Other `since` uses retain the original broad behavior.
+    """
+    remaining = _TEMPORAL_SINCE_PREFIX.sub("", text or "", count=1)
+    return bool(_REASONING.search(remaining))
 
 
 def should_probe(text: str) -> bool:
