@@ -20,7 +20,7 @@ from screenplay_cowriter.language_meta import (
 from screenplay_cowriter.context import (
     build_system_prompt, ScriptContext, ReportContext,
     LANGUAGE_META_INSTRUCTION, PLAIN_TEXT_INSTRUCTION, GROUNDING_INSTRUCTION,
-    resolve_referenced_scenes,
+    resolve_referenced_scenes, build_scene_context_block,
 )
 from screenplay_cowriter.engine import CoWriterEngine, clean_reply, REPEAT_PENALTY
 from screenplay_cowriter.reply_transforms import ground_reply as _ground_reply
@@ -629,6 +629,36 @@ class TestCharacterSceneResolution:
 
     def test_explicit_scene_and_character_union(self):
         assert resolve_referenced_scenes("scene 1, and what about Rishi", self._script()) == [1, 2, 3]
+
+    def test_explicit_late_scene_keeps_priority_over_character_scenes(self):
+        scenes = []
+        for number in range(1, 12):
+            elements = []
+            if number in (1, 3, 5, 6, 11):
+                elements.extend([
+                    {"type": "character", "text": "AJAY"},
+                    {"type": "dialogue", "text": f"AJAY speaks in scene {number}."},
+                ])
+            if number == 11:
+                elements.append({
+                    "type": "action", "text": "AJAY hugs the book as if embracing Darshi."
+                })
+            scenes.append({
+                "scene_number": number,
+                "heading_raw": f"INT. ROOM {number} - NIGHT",
+                "elements": elements,
+            })
+        script = ScriptContext({"title": "Synthetic retrieval fixture", "scenes": scenes})
+        question = "In Scene 11, does the ending convey Ajay’s influence?"
+
+        selected = resolve_referenced_scenes(question, script)
+        assert selected == [11, 1, 3, 5]
+        ordered_refs = resolve_referenced_scenes(
+            "Compare Scene 11 with Scene 10, then AJAY's scenes.", script
+        )
+        assert ordered_refs[:2] == [11, 10]
+        block = build_scene_context_block(script, selected, budget=10_000)
+        assert "AJAY hugs the book as if embracing Darshi." in block
 
     def test_no_mention_no_injection(self):
         assert resolve_referenced_scenes("the pacing feels slow", self._script()) == []

@@ -706,7 +706,8 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
 
 
 def extract_scene_refs(text: str) -> list:
-    return sorted(set(int(n) for n in SCENE_REF_RE.findall(text)))[:MAX_SCENES_INJECTED_PER_TURN]
+    """Unique scene numbers in the order the writer mentions them."""
+    return list(dict.fromkeys(int(n) for n in SCENE_REF_RE.findall(text)))[:MAX_SCENES_INJECTED_PER_TURN]
 
 
 CHAR_MIN_LEN = 3  # ignore very short names ("AM", "JO") to avoid false-positive word matches
@@ -775,17 +776,22 @@ def extract_character_refs(text: str, script_ctx: ScriptContext) -> list:
 
 def resolve_referenced_scenes(text: str, script_ctx: ScriptContext,
                               max_n: int = MAX_SCENES_INJECTED_PER_TURN) -> list:
-    """Scene numbers worth pulling into this turn's context: explicit
-    'scene N' mentions plus every scene where a named character speaks.
-    Character mentions are how writers actually refer to their script —
-    without them the model answers from the map + report alone and fills the
-    gaps by inventing. The cap keeps context growth bounded on long chats."""
-    refs = extract_scene_refs(text)
+    """Scene numbers worth pulling into this turn's context.
+
+    Explicit ``Scene N`` references are kept first, in the writer's mention
+    order. Character-associated scenes are useful supporting context, but must
+    not crowd out the scene the writer explicitly asked about when the cap
+    binds. The cap keeps context growth bounded on long chats.
+    """
+    refs = list(dict.fromkeys(extract_scene_refs(text)))
+    seen = set(refs)
+    presence = script_ctx.character_presence()
     for name in extract_character_refs(text, script_ctx):
-        for n in script_ctx.character_presence()[name]:
-            if n not in refs:
-                refs.append(n)
-    return sorted(refs)[:max_n]
+        for number in presence[name]:
+            if number not in seen:
+                refs.append(number)
+                seen.add(number)
+    return refs[:max(0, max_n)]
 
 
 def window_scene_text(text: str, cap: int) -> tuple:
