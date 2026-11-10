@@ -1101,6 +1101,9 @@ function renderConnCard() {
     `<div class="conn-card-row ${cls}"><b>${escapeHtml(stateTxt)}</b></div>` +
     `<div class="conn-card-row">model <b>${escapeHtml(demo ? "demo craft model" : (mid || "—"))}</b></div>` +
     `<div class="conn-card-row">server <b>${escapeHtml(url)}</b></div>` +
+    (demo
+      ? '<div class="conn-card-row demo-lifetime">Switching models does not stop this in-process demo server; it stays available until this Studio process exits.</div>'
+      : "") +
     (state.codeRev
       ? `<div class="conn-card-row">code <b>${escapeHtml(state.codeRev)}</b></div>` : "") +
     (demo && state.realServer && state.realServer.available

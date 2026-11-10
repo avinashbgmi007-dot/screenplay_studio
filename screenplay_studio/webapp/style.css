@@ -4763,7 +4763,7 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
 .conn-card-row.ok b { color: var(--ok, #7fae72); }
 .conn-card-row.demo b { color: var(--sev-mid-text); }
 .conn-card-row.fail b { color: var(--danger-text); }
-.conn-card-row.switch { color: var(--desk-amber-bright); white-space: normal; }
+.conn-card-row.switch, .conn-card-row.demo-lifetime { color: var(--desk-amber-bright); white-space: normal; }
 
 /* ============================================================
    NOCTA DESIGN SYSTEM — Craft Precision
