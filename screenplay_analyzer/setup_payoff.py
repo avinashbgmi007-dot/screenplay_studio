@@ -45,7 +45,7 @@ MAX_LEDGER_ENTRIES = 12
 # a beat, while a clock on the wall usually is not.
 _TIME_PATTERNS = [
     re.compile(r"\b\d+\s*(?:mints?|minutes?|mins?|seconds?|secs?|hours?|hrs?)\b", re.I),
-    re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b"),
+    re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b(?!\s*(?:AM|PM|am|pm))", re.I),
     re.compile(r"\b(?:count\s?downs?|deadlines?|ticking|timers?|alarms?)\b", re.I),
 ]
 MAX_TIME_SEEDS = 4

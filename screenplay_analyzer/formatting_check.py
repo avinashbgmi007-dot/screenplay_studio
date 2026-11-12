@@ -35,27 +35,47 @@ def check_formatting(doc: ScriptDocument) -> list[dict]:
     # 2. Character introduced in dialogue before appearing in ALL CAPS in an action line
     #    (industry convention: a character's name should appear in caps in action
     #    text on their first appearance, not just as a dialogue-cue debut).
+    #    Skipped when the script doesn't follow Hollywood caps conventions (e.g.
+    #    Tenglish/non-English scripts where characters are introduced in dialogue
+    #    and action lines use mixed case) — detected by checking whether ANY
+    #    character is introduced in ALL CAPS in action text.
     introduced_in_action = set()
+    # Language-aware: the ALL-CAPS introduction convention is a Hollywood
+    # (English) formatting rule. If NO character is ever introduced in ALL
+    # CAPS in action text, the script doesn't follow this convention (e.g.
+    # Tenglish, Hindi, Tamil scripts) — skip the check entirely. If at least
+    # one character IS introduced in caps, the script follows the convention
+    # and we flag the rest.
+    caps_introduced = set()
     for scene in doc.scenes:
         for el in scene.elements:
             if el.type == ElementType.ACTION:
                 for name in doc.all_characters:
-                    if name in introduced_in_action:
+                    if name in caps_introduced:
                         continue
-                    # look for the name as an ALL-CAPS whole word in the action text
                     if re.search(rf"\b{re.escape(name)}\b", el.text):
-                        introduced_in_action.add(name)
-            elif el.type == ElementType.CHARACTER and el.character:
-                if el.character not in introduced_in_action:
-                    findings.append({
-                        "rule": "character_not_capitalized_on_first_appearance",
-                        "severity": "low",
-                        "scene_refs": [scene.scene_number],
-                        "message": f"'{el.character}' speaks in Scene {scene.scene_number} before "
-                                    f"appearing in ALL CAPS in any action line — convention is to "
-                                    f"introduce a character in caps in action text on first appearance.",
-                    })
-                    introduced_in_action.add(el.character)  # only flag once per character
+                        caps_introduced.add(name)
+    # Only apply the check if the script demonstrates the convention
+    if len(caps_introduced) > 0:
+        for scene in doc.scenes:
+            for el in scene.elements:
+                if el.type == ElementType.ACTION:
+                    for name in doc.all_characters:
+                        if name in introduced_in_action:
+                            continue
+                        if re.search(rf"\b{re.escape(name)}\b", el.text):
+                            introduced_in_action.add(name)
+                elif el.type == ElementType.CHARACTER and el.character:
+                    if el.character not in introduced_in_action:
+                        findings.append({
+                            "rule": "character_not_capitalized_on_first_appearance",
+                            "severity": "low",
+                            "scene_refs": [scene.scene_number],
+                            "message": f"'{el.character}' speaks in Scene {scene.scene_number} before "
+                                        f"appearing in ALL CAPS in any action line — convention is to "
+                                        f"introduce a character in caps in action text on first appearance.",
+                        })
+                        introduced_in_action.add(el.character)  # only flag once per character
 
     # 3. Heavy parenthetical usage per character (potential over-directing of actors)
     paren_counts = {}

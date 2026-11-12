@@ -94,6 +94,15 @@ KB_FRAGMENT_CHAR_BUDGET = _env_int("SCREENPLAY_KB_BUDGET", KB_FRAGMENT_SOFT_WARN
 
 _TIER_ORDER = {"high": 0, "medium": 1, "low": 2}
 
+# Minimum confidence tier to include in prompts. Rules below this tier are
+# excluded from prompt fragments (they remain in the KB for reference and
+# deterministic passes). Default "low" includes all rules (backward compat).
+KB_MIN_TIER = os.environ.get("SCREENPLAY_KB_MIN_TIER", "low").strip().lower()
+if KB_MIN_TIER not in _TIER_ORDER:
+    warnings.warn(f"SCREENPLAY_KB_MIN_TIER={KB_MIN_TIER!r} is not a valid tier; using 'low'.",
+                  RuntimeWarning, stacklevel=2)
+    KB_MIN_TIER = "low"
+
 # The sentence `_render_budgeted` appends when it has to shed rules, and the
 # substring a caller tests for to learn "this prompt's rule list is partial".
 # Part of the prompt contract, so it is named rather than retyped: a test that
@@ -168,9 +177,13 @@ class RulesContext:
         see `is_genre_scoped` for why the generic path must stay genre-neutral."""
         rules: list = []
         seen: set = set()
+        min_rank = _TIER_ORDER.get(KB_MIN_TIER, 2)
         for level in CATEGORY_TO_TAXONOMY_LEVELS.get(category, []):
             for r in self.kb.for_taxonomy_level(level):
                 if not include_genre_rules and is_genre_scoped(r):
+                    continue
+                tier_rank = _TIER_ORDER.get(getattr(r, "confidence_tier", "medium"), 1)
+                if tier_rank > min_rank:
                     continue
                 if r.id not in seen:
                     seen.add(r.id)
@@ -187,11 +200,15 @@ class RulesContext:
         rules = (self.rules_for_category(pass_name, include_genre_rules=include_genre_rules)
                  if pass_name in CATEGORY_TO_TAXONOMY_LEVELS else [])
         seen = {r.id for r in rules}
+        min_rank = _TIER_ORDER.get(KB_MIN_TIER, 2)
         for filename in PASS_EXTRAS.get(pass_name, []):
             if not hasattr(self.kb, "for_file"):
                 continue
             for r in self.kb.for_file(filename):
                 if not include_genre_rules and is_genre_scoped(r):
+                    continue
+                tier_rank = _TIER_ORDER.get(getattr(r, "confidence_tier", "medium"), 1)
+                if tier_rank > min_rank:
                     continue
                 if r.id not in seen:
                     seen.add(r.id)

@@ -161,10 +161,9 @@ class TestOneFilterIsTheOnlyFilter:
                             f"{persona}: {pat!r} duplicates a shared pattern"
                         )
 
-    def test_every_persona_list_is_non_empty_or_deliberately_absent(self):
-        # The three authored personas have their own rules; the reader personas
-        # rely on the shared ones alone.
-        for persona in ("writing_partner", "script_consultant", "premise_doctor"):
+    def test_every_persona_list_is_non_empty(self):
+        # Every persona now carries its own banned-phrase spec; the reader
+        # personas no longer rely on shared rules alone.
+        for persona in ("writing_partner", "script_consultant", "premise_doctor",
+                        "producer", "audience", "genre_specialist", "teacher", "dev_exec"):
             assert get_banned_phrases(persona), persona
-        for persona in ("producer", "audience", "genre_specialist", "teacher", "dev_exec"):
-            assert get_banned_phrases(persona) == [], persona

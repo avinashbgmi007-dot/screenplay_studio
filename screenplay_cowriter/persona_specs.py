@@ -101,6 +101,60 @@ PREMISE_DOCTOR_BANNED = [
     r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b",
 ]
 
+# --- Producer banned phrases ---
+PRODUCER_BANNED = [
+    # Corporate buzzwords
+    r"\b(?:synergy|bandwidth|leverage|scalable|paradigm|pivot|disrupt)\b",
+    # False optimism
+    r"\b(?:we can make this work|it just needs (?:tweaking|polishing)|great potential)\b",
+    # Tentpole jargon
+    r"\b(?:tentpole|four-quadrant|IP|franchise potential|brand extension)\b",
+    # Hedging
+    r"\b(?:I think|I feel|maybe|perhaps)\b",
+]
+
+# --- Dev Exec banned phrases ---
+DEV_EXEC_BANNED = [
+    # Corporate meeting-speak
+    r"\b(?:let's table this|circle back|action items|take this offline|parking lot)\b",
+    # Vague notes
+    r"\b(?:needs work|could be stronger|room to grow|more development)\b",
+    # Hedging
+    r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b",
+]
+
+# --- Teacher banned phrases ---
+TEACHER_BANNED = [
+    # Lecturing tone
+    r"\b(?:as I (?:mentioned|said|noted)|let me explain|you see|you must understand)\b",
+    # Academic jargon
+    r"\b(?:moreover|furthermore|consequently|henceforth|thusly)\b",
+    # Condescending praise
+    r"\b(?:good (?:job|work|effort)|nice (?:work|job)|well done)\b",
+    # Hedging
+    r"\b(?:I think|I feel|maybe|perhaps)\b",
+]
+
+# --- Audience banned phrases ---
+AUDIENCE_BANNED = [
+    # Industry jargon (audience doesn't use these)
+    r"\b(?:narrative arc|character development|three-act structure|subtext|thematic)\b",
+    # Analytical framing
+    r"\b(?:I would argue|in my analysis|from a craft perspective)\b",
+    # Hedging
+    r"\b(?:I think|I feel|maybe|perhaps)\b",
+]
+
+# --- Genre Specialist banned phrases ---
+GENRE_SPECIALIST_BANNED = [
+    # Generic genre praise
+    r"\b(?:subverts expectations|elevated (?:genre|horror|thriller)|genre-defying)\b",
+    # Vague comparisons
+    r"\b(?:reminds me of|in the tradition of|echoes of)\b",
+    # Hedging
+    r"\b(?:I think|I feel|maybe|perhaps)\b",
+]
+
 
 def get_banned_phrases(persona: str) -> list[str]:
     """The persona's OWN additional in-place patterns.
@@ -115,6 +169,16 @@ def get_banned_phrases(persona: str) -> list[str]:
         return SUSHRUTA_BANNED
     if persona == "premise_doctor":
         return PREMISE_DOCTOR_BANNED
+    if persona == "producer":
+        return PRODUCER_BANNED
+    if persona == "dev_exec":
+        return DEV_EXEC_BANNED
+    if persona == "teacher":
+        return TEACHER_BANNED
+    if persona == "audience":
+        return AUDIENCE_BANNED
+    if persona == "genre_specialist":
+        return GENRE_SPECIALIST_BANNED
     return []
 
 

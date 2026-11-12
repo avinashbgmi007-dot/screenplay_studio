@@ -31,6 +31,20 @@ class TestSharedVoiceRules:
             assert "Great question!" in p, persona  # the anti-pattern is named, so it can be avoided
             assert "Never say \"as an AI\"" in p, persona
 
+    def test_every_persona_has_banned_phrases(self):
+        """Every persona must have banned-phrase specs for post-hoc cleanup."""
+        from screenplay_cowriter.persona_specs import get_banned_phrases
+        for persona in ALL_PERSONAS:
+            banned = get_banned_phrases(persona)
+            assert len(banned) > 0, f"{persona} has no banned-phrase spec"
+
+    def test_every_persona_has_example_dialogue(self):
+        """Every persona must have example dialogue locks for voice consistency."""
+        from screenplay_cowriter.personas import persona_examples
+        for persona in ALL_PERSONAS:
+            examples = persona_examples(persona)
+            assert examples, f"{persona} has no example dialogue lock"
+
     def test_voice_rules_appear_exactly_once(self):
         """Appending must not double the block for personas that embed it."""
         for persona in ALL_PERSONAS:
