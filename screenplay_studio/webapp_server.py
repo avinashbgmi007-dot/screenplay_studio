@@ -1727,6 +1727,36 @@ def get_edits(name):
                     "ambiguous_marks": ambiguous_marks(m)})
 
 
+def _rewrite_finding_text(finding) -> str:
+    """The `finding_text` block handed to `rewrite_scene`.
+
+    Carries the finding's trust state so an ungrounded or contested note can't
+    drive replacement lines as if it were confirmed. Pure and deterministic
+    given the same finding; an unmarked finding renders exactly as before.
+    """
+    if not isinstance(finding, dict):
+        return ""
+    refs = ", ".join(f"Scene {n}" for n in (finding.get("scene_refs") or []))
+    parts = [f"[{finding.get('severity', 'medium').upper()}] {refs or 'General'}: "
+             f"{finding.get('issue', '')} — {finding.get('why_it_matters', '')}"]
+    if finding.get("evidence_quote"):
+        parts[0] += f' Evidence: "{finding["evidence_quote"]}"'
+    try:
+        from screenplay_cowriter.context import trust_tags, trust_legend
+    except Exception:
+        return "\n".join(parts)
+    tags = trust_tags(finding)
+    if not tags:
+        return "\n".join(parts)
+    parts.append("")
+    parts.append(f"TRUST STATE — {' · '.join(tags)}")
+    parts.append(trust_legend(tags))
+    parts.append("Do not rewrite the scene to satisfy this note until it has been "
+                 "verified against the pages; treat it as a question to check, "
+                 "not a confirmed defect, and never raise its severity.")
+    return "\n".join(parts)
+
+
 @app.route("/api/projects/<name>/rewrite", methods=["POST"])
 def rewrite_scene_endpoint(name):
     """Model-suggested line replacements for one scene. Generates candidates
@@ -1770,13 +1800,7 @@ def rewrite_scene_endpoint(name):
             idx = int(finding_index)
             if 0 <= idx < len(findings):
                 finding = findings[idx]
-                refs = ", ".join(f"Scene {n}" for n in (finding.get("scene_refs") or []))
-                finding_text = (
-                    f"[{finding.get('severity', 'medium').upper()}] {refs or 'General'}: "
-                    f"{finding.get('issue', '')} — {finding.get('why_it_matters', '')}"
-                )
-                if finding.get("evidence_quote"):
-                    finding_text += f" Evidence: \"{finding['evidence_quote']}\""
+                finding_text = _rewrite_finding_text(finding)
         except (FileNotFoundError, KeyError, IndexError, ValueError,
                 StoreUnreadable):
             # R6-BE-9: `StoreUnreadable` is a RuntimeError, so it does NOT ride in
