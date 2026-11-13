@@ -383,6 +383,10 @@ class CoWriterEngine:
         # make sure the quoted scene is pulled into context even if the free
         # text doesn't mention it by number.
         quote = normalize_quote(quote)
+        # `kind` is turn-scoped wording for THIS reply; the stored message keeps
+        # the two-field shape every reader (client card, old sessions) knows.
+        stored_quote = ({k: quote[k] for k in ("scene_number", "text")}
+                        if quote is not None else None)
 
         # A pending probe is resolved by whatever comes next: an idea is the
         # answer to it, a question/directive is a topic change. Either way the
@@ -439,7 +443,23 @@ class CoWriterEngine:
             scene_refs.append(quote["scene_number"])
 
         quote_context = None
-        if quote is not None:
+        if quote is not None and quote.get("kind") == "note":
+            # A finding's own wording, not authored pages: the desk pins a note
+            # here when it has no evidence_quote. Calling this "a passage the
+            # writer selected" told the model an ungrounded machine opinion was
+            # verbatim script prose, and it dutifully grounded on it.
+            where = (f"Scene {quote['scene_number']}" if quote["scene_number"] is not None
+                     else "this project")
+            quote_context = (
+                f"The writer is asking about a doctor's note on {where}. These are "
+                "the NOTE's words, not script text — not dialogue and not action the "
+                "writer wrote:\n\n"
+                f"\"{quote['text']}\"\n\n"
+                "Judge the note itself against the pages. If the script does not "
+                "support it, say so plainly instead of repairing it; keep the reply "
+                "plain prose."
+            )
+        elif quote is not None:
             # wording follows the room: idea pages have no scenes
             source = ("their idea page" if self.premise is not None else "the script")
             if quote["scene_number"] is not None:
@@ -462,7 +482,9 @@ class CoWriterEngine:
         # message) so no model can miss it — the question sits right under it.
         prompt_user = user_text
         if quote is not None:
-            prompt_user = f'Passage from the script: \"{quote["text"]}\"\n\n{user_text}'
+            label = ("Note under discussion" if quote.get("kind") == "note"
+                     else "Passage from the script")
+            prompt_user = f'{label}: \"{quote["text"]}\"\n\n{user_text}'
 
         # Language mirror: reply in the register the writer used (Telugu /
         # Hindi / Tenglish / Hinglish / English). Deterministic detection on
@@ -529,7 +551,7 @@ class CoWriterEngine:
 
         reply = ensure_forward_momentum(reply, turn_kind, branch.active_persona)
 
-        branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode, quote=quote, partner=branch.active_persona))
+        branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode, quote=stored_quote, partner=branch.active_persona))
         branch.messages.append(Message(role="assistant", content=reply, mode=branch.active_mode, partner=branch.active_persona))
 
         if self.store is not None:

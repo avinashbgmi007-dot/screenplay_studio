@@ -7594,7 +7594,7 @@ function renderLoopBar() {
     bar.appendChild(mk("\u23ED next pass", "Park it for the next pass (R3)",
       () => setFindingIntent(cur.id, state.findingMarks[cur.id] === "deferred" ? null : "deferred")));
     bar.appendChild(mk("\u{1F4AC} discuss", "Ask Sameer about this exact line",
-      () => { setPendingQuote({ scene_number: findingTargetScene(cur.f), text: cur.f.evidence_quote || cur.f.issue || "" }); setDockLens("sameer"); }));
+      () => { const q = findingQuote(cur.f); if (q) setPendingQuote(q); setDockLens("sameer"); }));
     bar.appendChild(mk("\u29C9 copy", "Copy the evidence + scene slug (R7)", () => copyFindingEvidence(cur.f)));
   }
   bar.appendChild(mk("esc", "Leave the loop — N goes back to next-scene", exitLoop));
@@ -8214,12 +8214,22 @@ async function openScriptView() {
   renderManuscript(document.getElementById('manuscript-container'));
 }
 
+// The note as a turn attachment. A finding's own `issue` text is NOT a passage
+// from the script: pinning it as one told the persona that an ungrounded note's
+// wording was authored prose. With no evidence_quote the note rides as a note,
+// and the backend words the turn as "the NOTE's words, not script text".
+function findingQuote(f) {
+  const sceneNumber = (f.scene_refs || [])[0] || null;
+  if (f.evidence_quote) return { scene_number: sceneNumber, text: f.evidence_quote };
+  if (f.issue) return { scene_number: sceneNumber, text: f.issue, kind: "note" };
+  return null;
+}
+
 function discussFinding(f, index) {
   openCowriteRoom();
   const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "the whole script";
-  const sceneNumber = (f.scene_refs || [])[0] || null;
-  const quoteText = f.evidence_quote || f.issue;
-  if (quoteText) setPendingQuote({ scene_number: sceneNumber, text: quoteText });
+  const q = findingQuote(f);
+  if (q) setPendingQuote(q);
   $("#input").value = `About the note on ${refs}: how should I approach fixing it?`;
   autoResizeTextarea();
   $("#input").focus();
@@ -8232,8 +8242,8 @@ function discussFinding(f, index) {
 // was about to type.
 function discussWithDoctor(f, index) {
   const sceneNumber = (f.scene_refs || [])[0] || null;
-  const quoteText = f.evidence_quote || f.issue;
-  if (quoteText) setPendingQuote({ scene_number: sceneNumber, text: quoteText });
+  const q = findingQuote(f);
+  if (q) setPendingQuote(q);
   openDock("sushruta");
   const input = document.getElementById("fv-consult-input");
   if (input) {

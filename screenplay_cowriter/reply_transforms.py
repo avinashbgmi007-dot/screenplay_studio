@@ -193,11 +193,24 @@ def persona_register(reply: str, persona: str) -> str:
     return strip_banned_phrases(reply, persona)
 
 
+# KNOWN QUOTE KINDS. `selection` is the writer highlighting script text; it is
+# the default so every legacy caller keeps its exact wording. `note` is the
+# desk pinning a finding's own wording when it has NO evidence_quote — the
+# client used to send that as a selection, so the model was told an ungrounded
+# note was verbatim script prose ("the writer selected this passage").
+QUOTE_KINDS = ("selection", "note")
+
+
 def normalize_quote(quote):
-    """Select-to-reply passage from the webapp: {'scene_number': int|None, 'text': str}.
+    """A passage pinned to the next turn: {'scene_number': int|None, 'text': str,
+    'kind': 'selection'|'note'}.
+
     scene_number None means "general" (e.g. a script-level finding with no scene
-    ref). Callers (CLI, server) pass nothing — None stays None. Anything malformed
-    is dropped rather than crashing the turn."""
+    ref). `kind` decides how the turn is worded, so it is normalized here rather
+    than trusted from the wire; an unknown kind falls back to `selection`, which
+    is what every caller meant before this field existed. Callers (CLI, server)
+    pass nothing — None stays None. Anything malformed is dropped rather than
+    crashing the turn."""
     if not isinstance(quote, dict):
         return None
     scene_number = quote.get("scene_number")
@@ -208,5 +221,8 @@ def normalize_quote(quote):
         return None
     if scene_number is not None:
         scene_number = max(1, scene_number)
+    kind = quote.get("kind")
+    if kind not in QUOTE_KINDS:
+        kind = "selection"
     text = text[:4000]  # a quoted passage is a snapshot; cap it defensively
-    return {"scene_number": scene_number, "text": text}
+    return {"scene_number": scene_number, "text": text, "kind": kind}
