@@ -286,6 +286,91 @@ class ScriptContext:
         return "\n".join(kept)
 
 
+# ---------------------------------------------------------------------------
+# Trust state
+# ---------------------------------------------------------------------------
+# The analyzer demotes weak findings; it never deletes them ("flag, don't
+# drop"). Every demotion leaves a boolean on the row, and the verifier leaves a
+# status — but compact_summary() used to pass only category/severity/scene/issue,
+# so a finding whose own evidence failed was handed to the persona as a plain
+# complaint. Its demoted severity then read as "this one is minor" when it
+# actually meant "this one is unproven": the marker is the honest signal, the
+# severity is not.
+#
+# Fixed order (not dict order) so the same report always renders the same
+# string — the prompt is compared byte-for-byte in tests and cached upstream.
+TRUST_TAGS = (
+    ("ungrounded", "UNGROUNDED"),
+    ("contested", "CONTESTED"),
+    ("summary_only", "SUMMARY ONLY"),
+    ("identity_uncertain", "IDENTITY UNCERTAIN"),
+)
+
+# Verification statuses that mean "the citation could not be checked".
+# `verified` is deliberately absent: a located quote is not a marker.
+VERIFICATION_TAGS = {
+    "not_found": "UNVERIFIED QUOTE",
+    "scene_not_found": "SCENE NOT FOUND",
+    "no_quote": "NO QUOTE",
+}
+
+# What each marker means, in the same fixed order the tags themselves render.
+# A marker absent from this report is never explained: the legend is read by a
+# model with a finite window, so spelling out four markers it will not see is
+# paid for on every turn and teaches nothing.
+TRUST_MARKER_HELP = {
+    "UNGROUNDED": ("no quote and no checkable observation. Its severity is held "
+                   "at low by construction, so 'low' there means unproven, not minor"),
+    "CONTESTED": ("the script's own text argues against the note. Default to the "
+                  "writer's pushback being right"),
+    "SUMMARY ONLY": "an opinion about a scene with no cited line",
+    "IDENTITY UNCERTAIN": "the text cannot settle which character is meant",
+    "UNVERIFIED QUOTE": "the cited line was not found in the script",
+    "SCENE NOT FOUND": "the cited scene was not found in the script",
+    "NO QUOTE": "no citation was offered",
+}
+
+# Rendered order for the help lines — independent of dict order above.
+TRUST_MARKER_ORDER = tuple(tag for _, tag in TRUST_TAGS) + tuple(VERIFICATION_TAGS.values())
+
+TRUST_LEGEND_HEAD = (
+    "TRUST MARKERS — a marker means the evidence behind that finding is weaker "
+    "than its wording. The marker is the honest signal; the severity is not."
+)
+TRUST_LEGEND_TAIL = (
+    "Discuss a marked finding as something to verify against the pages. Never "
+    "present one as a confirmed defect, and never raise its severity."
+)
+
+
+def trust_legend(tags_present) -> str:
+    """The legend for exactly the markers in this report; "" when none.
+
+    Kept a pure function of the markers present so a report that is only
+    `summary_only` reads about `summary_only` alone."""
+    present = set(tags_present)
+    lines = [f"  {tag} — {TRUST_MARKER_HELP[tag]}"
+             for tag in TRUST_MARKER_ORDER if tag in present]
+    if not lines:
+        return ""
+    return "\n".join([TRUST_LEGEND_HEAD, *lines, TRUST_LEGEND_TAIL])
+
+
+def trust_tags(finding: dict) -> list:
+    """The trust markers a finding carries, in a fixed order.
+
+    Pure and total: a finding with nothing flagged returns [], so a clean report
+    renders exactly as it did before this existed."""
+    if not isinstance(finding, dict):
+        return []
+    tags = [tag for key, tag in TRUST_TAGS if finding.get(key)]
+    status = str((finding.get("verification") or {}).get("status") or "").strip()
+    vtag = VERIFICATION_TAGS.get(status)
+    if vtag and vtag not in tags:
+        tags.append(vtag)
+    return tags
+
+
 class ReportContext:
     """Thin wrapper over a Piece 2 findings.json dict."""
 
@@ -336,19 +421,29 @@ class ReportContext:
             findings = [findings[i] for i in keep]
 
         if findings:
-            parts.append("REPORT FINDINGS:")
+            lines = []
+            present = []
             for f in findings:
                 scene_str = ", ".join(f"Scene {n}" for n in f.get("scene_refs", [])) or "General"
-                status = f.get("verification", {}).get("status", "")
-                flag = " [UNVERIFIED QUOTE]" if status == "not_found" else ""
+                tags = trust_tags(f)
+                present.extend(t for t in tags if t not in present)
+                flag = f" [{' · '.join(tags)}]" if tags else ""
                 issue = f.get('issue', f.get('finding', ''))  # fallback for older report.findings.json files
                 why = "" if drop_why else f.get('why_it_matters', '')
                 line = f"- ({f.get('category')}, {f.get('severity')}) {scene_str}: {issue}"
                 if why:
                     line += f" — {why}"
-                parts.append(f"{line}{flag}")
+                lines.append(f"{line}{flag}")
             if omitted:
-                parts.append(f"({omitted} further finding(s) not listed here — for space.)")
+                lines.append(f"({omitted} further finding(s) not listed here — for space.)")
+            parts.append("REPORT FINDINGS:")
+            # Only when something is actually marked, and only for the markers
+            # that are: an unmarked report stays byte-identical to what it was
+            # before trust state was carried.
+            legend = trust_legend(present)
+            if legend:
+                parts.append(legend)
+            parts.extend(lines)
 
         formatting = self.data.get("formatting_findings", [])
         if formatting:

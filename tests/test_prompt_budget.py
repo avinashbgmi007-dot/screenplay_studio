@@ -19,13 +19,14 @@ prompt of ordinary size is left untouched by the default.
 """
 
 import contextlib
+import types
 import warnings
 
 import pytest
 
 from screenplay_cowriter.context import (
     PROMPT_SHED_LADDER, PROMPT_TRIM_NOTE, PLAIN_TEXT_INSTRUCTION,
-    ReportContext, ScriptContext, build_system_prompt, persona_text,
+    ReportContext, ScriptContext, build_system_prompt, load_json, persona_text,
 )
 
 
@@ -307,3 +308,151 @@ class TestScriptMapTrim:
 
     def test_a_script_with_no_scenes_still_returns_empty(self):
         assert ScriptContext({"title": "T"}).script_map(max_chars=10) == ""
+
+
+# --------------------------------------------------------------------------
+# trust state reaches the persona
+# --------------------------------------------------------------------------
+
+class _Doc:
+    """The attributes the analyzer's report writer and its two identity checks
+    read off a ScriptDocument. Scene 2 exists with no dialogue so the identity
+    check can run and cannot prove the equation either way."""
+    title = "Trust Test"
+    source_filename = "trust.txt"
+    author = None
+    source_format = "txt"
+    scene_count = 1
+    estimated_page_count = 1.0
+    parse_confidence = "high"
+    all_characters = ["RAJ", "PEN GUY"]
+    scenes = [types.SimpleNamespace(
+        scene_number=2, heading_raw="INT. FLAT - NIGHT", elements=[], characters_present=["RAJ"]
+    )]
+
+
+def _real_report_path(tmp_path):
+    """A real `report.findings.json`, written by the production save path.
+
+    The flags are set by the analyzer's own functions — never hand-written — so
+    this test breaks if a demotion stops recording itself, and it reads the
+    file back from disk because that is how the co-writer gets it.
+    """
+    from screenplay_analyzer import pipeline as P
+    from screenplay_analyzer.pipeline import AnalysisResult
+    from screenplay_analyzer.report import save_report
+
+    result = AnalysisResult(doc=_Doc())
+    result.findings = [
+        # No quote, no observation -> apply_evidence_floor flags it ungrounded
+        # and pins severity low. `no_quote` is the verifier's own status for a
+        # finding that never offered a citation.
+        {"category": "dialogue", "issue": "marker-a on-the-nose line.",
+         "severity": "high", "scene_refs": [2], "evidence_quote": None,
+         "observation": None, "verification": {"status": "no_quote"}},
+        # A quote plus an observation that argues against the note itself.
+        {"category": "character", "issue": "marker-b lacks motivation.",
+         "severity": "high", "scene_refs": [2], "evidence_quote": "Who asked you?",
+         "observation": "The note claims no motivation; however, the script "
+                        "explicitly shows a direct confrontation."},
+        # A scene_function opinion with no cited line.
+        {"category": "scene_function", "issue": "marker-c provides a neat resolution.",
+         "severity": "medium", "scene_refs": [2], "evidence_quote": None,
+         "observation": "The scene resolves in one beat."},
+        # An identity verdict the pages cannot settle. Every marker here is
+        # lowercase on purpose: _identity_parties reads capitalized tokens in
+        # issue+observation as candidate names, so an all-caps marker would
+        # enter the cast check as a name and veto the row.
+        {"category": "character", "issue": "Raj is not the Pen Guy (marker-d).",
+         "severity": "high", "scene_refs": [2], "evidence_quote": "Who asked you?",
+         "observation": "Pen Guy is a distinct entity not named Raj."},
+        # A clean, cited finding: nothing should mark it.
+        {"category": "structure", "issue": "marker-e act two turns too late.",
+         "severity": "medium", "scene_refs": [2], "evidence_quote": "Who asked you?",
+         "observation": "The turn happens after the midpoint.",
+         "verification": {"status": "verified"}},
+    ]
+    P.apply_evidence_floor(result)
+    P.apply_scene_quote_rule(result.findings)
+    P.apply_identity_check(result.findings, _Doc())
+
+    md_path = tmp_path / "report.md"
+    json_path = tmp_path / "report.findings.json"
+    save_report(result, str(md_path), str(json_path))
+    return json_path
+
+
+def _lines_by_row(text):
+    """{row marker: the one rendered line that carries it}."""
+    out = {}
+    for line in text.splitlines():
+        for row in ("marker-a", "marker-b", "marker-c",
+                    "marker-d", "marker-e"):
+            if row in line:
+                out[row] = line
+    return out
+
+
+class TestTrustStateReachesThePersona:
+    """The analyzer demotes weak findings but never drops them; a persona that
+    receives them without their flags reads a demotion as assent. Every flag
+    below is produced by the analyzer's real functions and read back from a
+    real report.findings.json."""
+
+    def test_every_flag_survives_the_round_trip_to_its_own_line(self, tmp_path):
+        report = ReportContext(load_json(str(_real_report_path(tmp_path))))
+        lines = _lines_by_row(report.compact_summary())
+
+        expected = {
+            "marker-a": ["UNGROUNDED", "NO QUOTE"],
+            "marker-b": ["CONTESTED"],
+            "marker-c": ["SUMMARY ONLY"],
+            "marker-d": ["IDENTITY UNCERTAIN"],
+        }
+        for row, tags in expected.items():
+            assert row in lines, f"{row} never reached the prompt at all"
+            for tag in tags:
+                assert tag in lines[row], (
+                    f"{row} arrived as a plain complaint — expected [{tag}] "
+                    f"on its line, got: {lines[row]}")
+
+    def test_a_clean_finding_is_not_marked(self, tmp_path):
+        report = ReportContext(load_json(str(_real_report_path(tmp_path))))
+        line = _lines_by_row(report.compact_summary())["marker-e"]
+        assert "[" not in line, f"a verified finding was marked: {line}"
+
+    def test_the_legend_only_appears_when_something_is_marked(self, tmp_path):
+        marked = ReportContext(load_json(str(_real_report_path(tmp_path)))).compact_summary()
+        assert "TRUST MARKERS" in marked
+
+        clean = ReportContext({"findings": [
+            {"category": "structure", "severity": "medium", "issue": "Cited note.",
+             "evidence_quote": "Who asked you?", "verification": {"status": "verified"}},
+        ]}).compact_summary()
+        assert "TRUST MARKERS" not in clean
+        assert clean == ReportContext({"findings": [
+            {"category": "structure", "severity": "medium", "issue": "Cited note.",
+             "evidence_quote": "Who asked you?", "verification": {"status": "verified"}},
+        ]}).compact_summary()  # byte-stable: no marker, no legend, no drift
+
+    def test_the_legend_explains_only_the_markers_that_appear(self):
+        """A marker this report never uses is never explained: the legend rides
+        every turn, so spelling out four absent markers is paid for on every
+        turn and teaches nothing."""
+        only_summary = ReportContext({"findings": [
+            {"category": "scene_function", "severity": "medium",
+             "issue": "The resolution arrives in one beat.", "summary_only": True},
+        ]}).compact_summary()
+        assert "SUMMARY ONLY — an opinion about a scene with no cited line" in only_summary
+        for absent in ("CONTESTED", "IDENTITY UNCERTAIN", "UNGROUNDED",
+                       "UNVERIFIED QUOTE", "SCENE NOT FOUND", "NO QUOTE"):
+            assert absent not in only_summary, (
+                f"the legend explains {absent}, which this report does not carry")
+
+    def test_ungrounded_is_still_written_as_low_and_the_prompt_says_why(self, tmp_path):
+        """The severity is held low by construction; the marker is what stops
+        'low' from reading as 'minor'."""
+        report = ReportContext(load_json(str(_real_report_path(tmp_path))))
+        row = _lines_by_row(report.compact_summary())["marker-a"]
+        assert "(dialogue, low)" in row
+        assert "unproven, not minor" in report.compact_summary()

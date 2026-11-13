@@ -51,7 +51,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `models.py` | `Session`, `Branch`, `Message` | Session model with `fork`/`switch`/`delete_branch`/`save`/`load` |
 | `store.py` | `SessionStore` | File-backed session store (one JSON per session) |
 | `engine.py` | `CoWriterEngine` | `send_message()` — one grounded chat turn; saves the session itself when constructed with `store=` |
-| `context.py` | `ScriptContext`, `ReportContext`, `build_system_prompt`, `build_scene_context_block`, `extract_scene_refs`, `load_json` | Context + scene injection |
+| `context.py` | `ScriptContext`, `ReportContext`, `build_system_prompt`, `build_scene_context_block`, `extract_scene_refs`, `load_json`, `trust_tags`, `trust_legend` | Context + scene injection; `trust_tags` renders each finding's trust state (`UNGROUNDED`, `CONTESTED`, `SUMMARY ONLY`, `IDENTITY UNCERTAIN`, quote status) into the prompt so a demoted finding never arrives as a plain complaint, and `trust_legend` explains only the markers that report actually carries |
 | `personas.py` | `PERSONAS`, `PERSONAS["*_examples"]`, `MODES`, `persona_text`, `mode_text`, `DEFAULT_PERSONA`, `DEFAULT_MODE`, `post_history_reminder`, `trait_reminder` | Persona bible — 8 personas (writing_partner/premise_doctor/script_consultant/producer/dev_exec/teacher/audience/genre_specialist) × 5 modes (peer/evidence_discussion/concept_validation/brainstorm/character_interview); `_examples` keys are prompt-only, never exposed via /api/config |
 | `discovery.py` | `resolve_model` | explicit > inherited > loaded |
 | `llm_client.py` | `LlamaServerClient`, `LlamaServerError`, `ModelNotFoundError`, `WatchdogTimeoutError` | Lightweight free-text chat client (turn watchdog) |
