@@ -239,6 +239,58 @@ class TestF05RouteMapTotals:
 
 
 # ---------------------------------------------------------------------------
+# No top-level function may be defined twice
+# ---------------------------------------------------------------------------
+#
+# Moving 14 routes into `routes/` on 2026-11-13 left three functions behind in
+# TWO places: `create_sample_project`, `add_stash` and `add_stash_entry` kept
+# their undecorated bodies at the old spot while the routed copies appeared at
+# the bottom of the file. Python binds the LAST definition, so the bottom copy
+# silently won — an edit to the top one was a no-op, the route census counted
+# both, and ruff's F811 was the only thing that noticed. A duplicate is never
+# an accident worth keeping: it means one of the two is dead, and which one is
+# decided by source order rather than by intent.
+#
+# Read off the AST, not a regex: only a real top-level `def` shadows another,
+# and a bare `def foo(` in a comment or a docstring must not count as one.
+
+def _top_level_function_names(path):
+    import ast
+    with open(path, encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    return [n.name for n in tree.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+
+
+class TestNoDuplicateTopLevelDefs:
+    def test_webapp_server_defines_no_function_twice(self):
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        names = _top_level_function_names(
+            os.path.join(base, "screenplay_studio", "webapp_server.py"))
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        assert not dupes, (
+            f"webapp_server.py defines these top-level functions more than once: "
+            f"{dupes}. The later definition silently wins — delete the dead copy "
+            f"(this is the leftover the 2026-11-13 route extraction produced).")
+
+    def test_the_guard_would_catch_a_duplicate(self, tmp_path):
+        """A guard that cannot fail is not a guard: prove it on a real file."""
+        src = tmp_path / "dup.py"
+        src.write_text("def one():\n    pass\n\n\ndef one():\n    pass\n", encoding="utf-8")
+        names = _top_level_function_names(str(src))
+        assert sorted({n for n in names if names.count(n) > 1}) == ["one"]
+
+    def test_a_nested_def_or_a_docstring_is_not_a_duplicate(self, tmp_path):
+        """The false positives a regex would report: a nested def and prose."""
+        src = tmp_path / "nested.py"
+        src.write_text(
+            'def outer():\n    """def outer(): in prose, not a definition."""\n'
+            "    def inner():\n        pass\n    return inner\n",
+            encoding="utf-8")
+        assert _top_level_function_names(str(src)) == ["outer"]
+
+
+# ---------------------------------------------------------------------------
 # New API: GET /findings/summary (Report 2 §6 #1)
 # ---------------------------------------------------------------------------
 
