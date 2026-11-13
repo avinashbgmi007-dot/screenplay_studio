@@ -233,7 +233,7 @@ class TestF05RouteMapTotals:
         counts = _source_census()
         # 91 (audit baseline) + 5 verdict-channel routes + analyze/cancel (R2)
         # + library/backup (R7) = 98
-        assert counts["screenplay_studio/webapp_server.py"] == 98, (
+        assert counts["screenplay_studio/webapp_server.py"] == 84, (
             "the count the route map pins moved: regenerate the map (its header "
             "says how) and update this pin together")
 

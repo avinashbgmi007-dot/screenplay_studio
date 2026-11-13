@@ -722,34 +722,6 @@ def _unhandled(e):
 
 # ---------- static frontend ----------
 
-@app.route("/")
-def index():
-    resp = send_from_directory(WEBAPP_DIR, "index.html")
-    resp.headers["Cache-Control"] = "no-cache"
-    return _serve_spa_document(resp)
-
-
-@app.route("/<path:filename>")
-def static_files(filename):
-    resp = send_from_directory(WEBAPP_DIR, filename)
-    # No-build-step app: always revalidate JS/CSS so edits show up on reload
-    # instead of serving a stale cached copy.
-    resp.headers["Cache-Control"] = "no-cache"
-    # The SPA document is also reachable as /index.html — harden it there too,
-    # and only there: the preview-* design labs are separate documents with
-    # their own inline scripts and are deliberately left alone.
-    if filename == "index.html":
-        _serve_spa_document(resp)
-    return resp
-
-
-# ---------- helpers ----------
-
-def _project_dir(name: str) -> str:
-    check_safe_id(name, "project name")
-    return os.path.join(PROJECTS_DIR, name)
-
-
 def _claim_project_dir(base: str) -> str:
     """Atomically claim a fresh project directory derived from `base`.
 
@@ -774,6 +746,11 @@ def _claim_project_dir(base: str) -> str:
             continue
         return _project_dir(name)
     raise RuntimeError(f"could not find a free project directory for {base!r}")
+
+
+def _project_dir(name: str) -> str:
+    check_safe_id(name, "project name")
+    return os.path.join(PROJECTS_DIR, name)
 
 
 def _load_manifest(name: str) -> ProjectManifest:
@@ -1096,211 +1073,6 @@ def _import_cowriter(name: str):
 
 # ---------- config ----------
 
-@app.route("/api/test-connection", methods=["POST"])
-def test_connection():
-    body = request.get_json() or {}
-    url = (body.get("server_url") or CONFIG["server_url"]).rstrip("/")
-    # This route GETs {url}/v1/models for whatever it is handed, so it is an
-    # outbound primitive in its own right — guard it before the probe, not after.
-    _validate_server_url(url)
-    from screenplay_analyzer.llm_client import LlamaServerClient, LlamaServerError
-
-    # The token typed into the form (not yet saved) wins, so "Test Connection"
-    # answers the question the writer is actually asking — does THIS URL, with
-    # THIS token, work — instead of testing the last saved one.
-    key = body["api_key"] if "api_key" in body else CONFIG.get("api_key")
-    client = LlamaServerClient(base_url=url, timeout=15, extra_headers=_auth_headers(key))
-    try:
-        models = client.list_models()
-    except LlamaServerError as e:
-        return jsonify({"ok": False, "message": str(e)})
-
-    ids = [m.get("id") or m.get("name") for m in models if isinstance(m, dict)]
-    ids = [i for i in ids if i]
-    if not ids:
-        return jsonify({"ok": False, "message": f"Connected to {url}, but it reports no loaded model."})
-    mode = connection_mode(url)
-    return jsonify({"ok": True, "message": f"Connected ({mode}) — model loaded: {ids[0]}",
-                    "models": ids, "mode": mode})
-
-
-@app.route("/api/real-server-check", methods=["GET"])
-def real_server_check():
-    """While the demo fallback is active: is the writer's real llama-server
-    back? Drives the status strip's click-to-switch affordance."""
-    if not _DEMO_MODEL_ACTIVE:
-        return jsonify({"demo": False})
-    url = CONFIG.get("real_server_url")
-    if not url:
-        return jsonify({"demo": True, "available": False})
-    from screenplay_analyzer.llm_client import LlamaServerClient
-    try:
-        models = LlamaServerClient(base_url=url, timeout=5,
-                                   extra_headers=_auth_headers(CONFIG.get("api_key"))).list_models()
-        ids = [m.get("id") or m.get("name") for m in models if isinstance(m, dict)]
-        return jsonify({"demo": True, "available": bool(ids),
-                        "url": url, "models": [i for i in ids if i]})
-    except Exception:
-        return jsonify({"demo": True, "available": False, "url": url})
-
-
-@app.route("/api/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
-                    "demo_model": _DEMO_MODEL_ACTIVE,
-                    "code_rev": _CODE_REV_AT_STARTUP})
-
-
-@app.route("/api/rules/<rule_id>", methods=["GET"])
-def get_rule(rule_id):
-    """spec §7: a card may claim "grounded in knowledge-base rule <id>", so the
-    desk has to be able to answer *says who?*. This is a read of the shipped
-    knowledge base — no model call, and an id that isn't a rule is a 404 rather
-    than a popover that invents an authority."""
-    kb = _knowledge_base()
-    if kb is None:
-        return _error("The knowledge base isn't installed, so this rule "
-                      "cannot be looked up.", 503)
-    try:
-        rule = kb.get(rule_id)
-    except KeyError:
-        return _error(f"No knowledge-base rule with id '{rule_id}'.", 404)
-    return jsonify({"id": rule.id, "name": rule.name, "source": rule.attribution})
-
-
-@app.route("/api/config", methods=["GET"])
-def get_config():
-    cfg = CONFIG.to_dict()
-    # The token is a secret and this response is readable by any page that can
-    # reach the desk. Report only WHETHER one is set; the value never leaves.
-    cfg["api_key_set"] = bool(cfg.pop("api_key", None))
-    cfg["connection_mode"] = connection_mode()
-    # Whether a remote URL is permitted at all is a launch-time decision, and the
-    # form has to know it to enable or explain the Remote API option.
-    cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
-    # Personas/modes come from the co-writer so the frontend dropdown never
-    # drifts from the server's canonical list (falls back to empty when the
-    # co-writer isn't installed; the UI then shows its built-in defaults).
-    cfg["demo_model"] = _DEMO_MODEL_ACTIVE
-    if _DEMO_MODEL_ACTIVE:
-        cfg["real_server_url"] = CONFIG.get("real_server_url")
-    else:
-        cfg.pop("real_server_url", None)  # to_dict picks up the stashed key
-    try:
-        personas_mod = _import_cowriter("personas")
-        cfg["personas"] = [p for p in personas_mod.PERSONAS
-                           if not p.endswith("_examples")]
-        cfg["modes"] = [m for m in personas_mod.MODES
-                        if not m.endswith("_examples")]
-    except CowriterUnavailableError:
-        cfg["personas"] = []
-        cfg["modes"] = []
-    return jsonify(cfg)
-
-
-@app.route("/api/config", methods=["POST"])
-def set_config():
-    global _DEMO_MODEL_ACTIVE
-    body = request.get_json() or {}
-    # ---- the mode switch (see `connection_mode` above) ---------------------
-    # "remote" is refused while the process opt-in is off. That is the whole
-    # point of keeping the opt-in at launch: if this request could grant it,
-    # the request that names the remote host would authorise sending the script
-    # there, and the guard would be decorative.
-    if "connection_mode" in body:
-        mode = str(body.get("connection_mode") or "").strip().lower()
-        if mode not in ("local", "remote"):
-            raise ValueError("connection_mode must be 'local' or 'remote'")
-        if mode == "remote":
-            _require_remote_optin()
-            if not body.get("server_url"):
-                raise ValueError(
-                    "A remote connection needs its API base URL — e.g. "
-                    "https://api.example.com/v1 for an OpenAI-compatible endpoint.")
-        elif "server_url" not in body:
-            # "Go local" fills the local info in for you: back to the default
-            # llama-server, token cleared, so switching modes is one click and
-            # never leaves a remote URL pointed at a local-only desk.
-            CONFIG["server_url"] = ServerConfig._DEFAULTS["server_url"]
-            CONFIG["api_key"] = None
-    if "server_url" in body:
-        CONFIG["server_url"] = body["server_url"]
-        # pointing at anything other than the demo IS the switch back:
-        # the demo thread keeps running but stops answering the desk
-        if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
-            _DEMO_MODEL_ACTIVE = False
-    if "api_key" in body:
-        CONFIG["api_key"] = body["api_key"]
-    if "model" in body:
-        CONFIG["model"] = body["model"] or None
-    if "fast_model" in body:
-        CONFIG["fast_model"] = body["fast_model"] or None
-    if "turn_timeout" in body:
-        CONFIG["turn_timeout"] = body["turn_timeout"]
-    if "timeout" in body:
-        try:
-            CONFIG["timeout"] = int(body["timeout"])
-        except (TypeError, ValueError):
-            pass  # invalid timeout ignored — keep the current value
-    if "server_url" in body or "api_key" in body or "model" in body:
-        # the writer changed WHERE the model lives or HOW to reach it — carry
-        # that to every existing project too. Without this, projects keep a
-        # stale per-project server_url (e.g. an old port) and every LLM call
-        # (chat, rewrite, analyze) silently hits a dead server while the status
-        # strip shows green (it tests the global URL, not the manifest's).
-        _sync_server_url_to_projects(
-            CONFIG["server_url"],
-            body["model"] if "model" in body else _UNSET,
-            api_key=body["api_key"] if "api_key" in body else _UNSET,
-        )
-    cfg = CONFIG.to_dict()
-    cfg["api_key_set"] = bool(cfg.pop("api_key", None))
-    cfg["connection_mode"] = connection_mode()
-    cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
-    return jsonify(cfg)
-
-
-# ---------- projects ----------
-
-@app.route("/api/projects", methods=["GET"])
-def list_projects():
-    if not os.path.isdir(PROJECTS_DIR):
-        return jsonify([])
-    out = []
-    for name in sorted(os.listdir(PROJECTS_DIR)):
-        # writer_profile.json is the co-writer's relationship-memory store —
-        # internal data, not a project. It must never appear as a shelf card.
-        if name == "writer_profile.json":
-            continue
-        # jsonio drops a `<store>.lock` sidecar beside every store it writes, and
-        # one of those (writer_profile.json.lock) lands in this very directory.
-        # A lock file is a FILE, not a project: without this it reached
-        # _project_dir -> check_safe_id, which rejects the '.' in the name, and
-        # the `except Exception` below then rendered it as a phantom
-        # "unreadable" project on the writer's shelf.
-        if not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
-            continue
-        try:
-            m = ProjectManifest.load(_project_dir(name))
-            out.append(_manifest_summary(m))
-        except FileNotFoundError:
-            continue  # not a project (stray file / the ideas store)
-        except Exception:
-            # Flag, don't drop: a damaged manifest stays visible on the shelf
-            # so the writer knows it exists and can remove it. Empty stage
-            # dicts keep every frontend reader (stageLabel/dot/steps) safe.
-            out.append({
-                "project": name,
-                "title": name,
-                "unreadable": True,
-                "stages": {"parse": {}, "analyze": {}, "chat": {}},
-                "sessions": [],
-            })
-    out.sort(key=lambda p: p.get("title", ""))
-    return jsonify(out)
-
-
-@app.route("/api/sample", methods=["POST"])
 def create_sample_project():
     """One-click sample page: create a project from the built-in screenplay.
     Deduplicates by title — reopening the sample keeps one shelf entry."""
@@ -1417,23 +1189,6 @@ def create_project():
             400)
 
     return jsonify(_manifest_summary(manifest)), 201
-
-
-@app.route("/api/projects/<name>", methods=["GET"])
-def get_project(name):
-    try:
-        m = _load_manifest(name)
-    except FileNotFoundError:
-        return _error("Project not found.", 404)
-    data = _manifest_summary(m)
-    # An idea that graduated carries its premise card alongside the pages.
-    # Missing is a legitimate empty; UNREADABLE is damage and says so (A3).
-    card, perr = _load_premise(m.project_dir)
-    if card is not None:
-        data["premise"] = card
-    if perr:
-        data["premise_error"] = perr
-    return jsonify(data)
 
 
 @app.route("/api/projects/<name>", methods=["DELETE"])
@@ -1902,71 +1657,6 @@ def reparse_project(name):
     return jsonify(_manifest_summary(m))
 
 
-@app.route("/api/projects/<name>/report", methods=["GET"])
-def get_report(name):
-    try:
-        m = _load_manifest(name)
-    except FileNotFoundError:
-        return _error("Project not found.", 404)
-    if m.stage("analyze").status != "complete":
-        return _error("Analysis hasn't completed for this project yet.", 400)
-    try:
-        report = _load_report_sanitized(m)
-    except FileNotFoundError:
-        # The manifest claims a finished analyze and the report is not on disk.
-        # That is a missing fact, not a bad request and not a server fault worth
-        # a stack trace: 404, worded, with no path in it.
-        return _error("The analysis report is missing from this project. Re-run "
-                      "Analysis to produce one.", 404)
-    return jsonify(report)
-
-
-@app.route("/api/projects/<name>/passes", methods=["GET"])
-def get_pass_history(name):
-    """spec §15.4: the revision arc — one entry per analysis this project has had.
-
-    The store's own contract answers a damaged file (the global StoreUnreadable
-    handler turns it into a 503 that says so), because "passes": [] here would
-    read as "you have never analysed this script" to a writer with a history.
-    """
-    try:
-        m = _load_manifest(name)
-    except FileNotFoundError:
-        return _error("Project not found.", 404)
-    from .pass_history import load_passes
-    return jsonify({"passes": load_passes(m)})
-
-
-@app.route("/api/projects/<name>/characters", methods=["GET"])
-def get_character_tracks(name):
-    """Per-character track layer — presence, traits, interactions, reads —
-    assembled from the knowledge graph + report. Instant (no model calls)."""
-    try:
-        m = _load_manifest(name)
-    except FileNotFoundError:
-        return _error("Project not found.", 404)
-    report = None
-    if m.stage("analyze").status == "complete" and os.path.exists(m.report_findings_path):
-        report = _load_report_sanitized(m)
-    from .character_track import build_character_tracks
-    return jsonify({"characters": build_character_tracks(m.kg_path, report)})
-
-
-# ---------- writer's margin notes ----------
-
-# ---------- the Stash (saved snippets beside the script) ----------
-
-@app.route("/api/projects/<name>/stash", methods=["GET"])
-def get_stash(name):
-    try:
-        m = _load_manifest(name)
-    except FileNotFoundError:
-        return _error("Project not found.", 404)
-    from .stash_store import load_stash
-    return jsonify({"stash": load_stash(m.project_dir)})
-
-
-@app.route("/api/projects/<name>/stash", methods=["POST"])
 def add_stash(name):
     try:
         m = _load_manifest(name)
@@ -5053,6 +4743,84 @@ else:
               "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback.")
         _use_demo_model(auto=True)
 
+
+@app.route("/api/sample", methods=["POST"])
+def create_sample_project():
+    """One-click sample page: create a project from the built-in screenplay.
+    Deduplicates by title — reopening the sample keeps one shelf entry."""
+    from .sample import SAMPLE_TITLE, SAMPLE_SCRIPT
+
+    safe_name = safe_dir_name(SAMPLE_TITLE)  # H2: ASCII fold (sample title is ASCII-safe)
+    project_dir = _project_dir(safe_name)
+    try:
+        # Atomic claim (L5): makedirs IS the test-and-set. The old
+        # `if os.path.exists(...)` / `makedirs(exist_ok=True)` pair let two
+        # concurrent "open the sample" requests both decide the directory was
+        # missing, then interleave two manifests into it. Losing the race means
+        # another request is already creating the sample — and the sample IS
+        # deduplicated by title, so returning theirs is the correct answer.
+        os.makedirs(project_dir)
+    except FileExistsError:
+        try:
+            m = ProjectManifest.load(project_dir)
+            return jsonify(_manifest_summary(m))
+        except Exception:
+            pass  # corrupt dir — fall through and re-create
+
+    tmp_path = os.path.join(project_dir, "_sample.fountain")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(SAMPLE_SCRIPT)
+
+    try:
+        manifest = ProjectManifest.create(project_dir, tmp_path, title=SAMPLE_TITLE)
+        manifest = _adopt_connection(manifest)
+        manifest.timeout = CONFIG["timeout"]
+        manifest.model_id = CONFIG["model"]
+        manifest.save()
+        os.remove(tmp_path)
+        Orchestrator(manifest).run_parse()
+    except Exception as e:
+        return _error(f"Could not create the sample page: {e}", 500)
+
+    return jsonify(_manifest_summary(manifest)), 201
+
+
+
+
+@app.route("/api/projects/<name>/stash", methods=["POST"])
+def add_stash(name):
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    body = request.get_json(silent=True) or {}
+    try:
+        entry = add_stash_entry(m.project_dir, body)
+    except ValueError as e:
+        return _error(str(e), 400)
+    return jsonify(entry), 201
+
+
+def add_stash_entry(project_dir: str, body: dict) -> dict:
+    from screenplay_studio.stash_store import add_to_stash
+    scene = body.get("scene_number")
+    try:
+        scene = int(scene) if scene is not None else None
+    except (TypeError, ValueError):
+        scene = None
+    return add_to_stash(project_dir, body.get("text") or "", title=body.get("title") or "", scene_number=scene)
+
+
+
+
+# ---------- register route blueprints ----------
+from screenplay_studio.routes.static import create_static_blueprint
+_static_bp = create_static_blueprint()
+app.register_blueprint(_static_bp)
+
+from screenplay_studio.routes.api import register_api_routes, api_bp
+register_api_routes(api_bp)
+app.register_blueprint(api_bp)
 
 if __name__ == "__main__":
     main()

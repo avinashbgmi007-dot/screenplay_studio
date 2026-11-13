@@ -20,7 +20,7 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 98 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **100**.
+**Totals:** 84 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **86**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
 after adding or changing any `@app.route` — this map had drifted by +4 before
 the 2026-09-30 audit, the verdict channel added 5 more, and this branch added

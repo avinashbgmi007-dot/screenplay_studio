@@ -44,7 +44,7 @@ stt = ["faster-whisper>=1.0.0"]
 ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "PyYAML>=6.0", "ruff==0.16.8", "setuptools>=68"]
 
 [tool.setuptools]
-packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "screenplay_studio", "knowledge_base"]
+packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "screenplay_studio", "screenplay_studio.routes", "knowledge_base"]
 # Ship the non-.py assets too. `packages` alone yields a wheel with ZERO data
 # files: no craft-rule JSON (the KB degrades *silently* to empty — every report
 # loses its "grounded in rule X" claim with no error) and no SPA at all (the
