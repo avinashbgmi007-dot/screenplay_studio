@@ -5,22 +5,18 @@ Routes import ``state`` from this module and access attributes like
 writes go through to ``webapp_server`` (resolved lazily to handle the
 ``__main__`` case when the server is started with ``-m``).
 """
+import sys
+
 
 class _State:
+    def _ws(self):
+        return sys.modules.get("screenplay_studio.webapp_server") or sys.modules.get("__main__")
+
     def __getattr__(self, name):
-        import sys
-        ws = sys.modules.get("screenplay_studio.webapp_server") or sys.modules.get("__main__")
-        return getattr(ws, name)
+        return getattr(self._ws(), name)
 
     def __setattr__(self, name, value):
-        import sys
-        ws = sys.modules.get("screenplay_studio.webapp_server") or sys.modules.get("__main__")
-        setattr(ws, name, value)
-
-    def __dir__(self):
-        import sys
-        ws = sys.modules.get("screenplay_studio.webapp_server") or sys.modules.get("__main__")
-        return dir(ws)
+        setattr(self._ws(), name, value)
 
 
 state = _State()

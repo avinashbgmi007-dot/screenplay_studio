@@ -30,13 +30,14 @@ import zipfile
 from functools import lru_cache
 from urllib.parse import urlparse
 
-from flask import Flask, Response, request, jsonify, send_from_directory, send_file
+from flask import Flask, Response, request, jsonify, send_file
 from werkzeug.exceptions import HTTPException
 
 from .jsonio import (StoreLockTimeout, StoreUnreadable, atomic_write_json,
                      check_safe_id, lock_for, retry_permission, safe_dir_name,
                      suffixed_id)
 
+from .helpers import _code_revision, _stale_code_warning, _strip_rewrite_noise
 from .ideas import IdeaStore
 from .logsetup import configure as _configure_logging
 from .manifest import ProjectManifest
@@ -53,51 +54,6 @@ for _stream in (sys.stdout, sys.stderr):
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
 app = Flask(__name__, static_folder=None)
-
-
-def _code_revision(root=None):
-    """The code this process analyzes with, as `"<short-hash>[+dirty]"`.
-
-    A long-lived desk loads modules once at boot and never again, so an
-    analysis can silently run week-old code (measured 2026-10-13: a re-run
-    served pre-fix findings with no signal anywhere). Best-effort and
-    never raising: no git, no checkout, or any error answers "unknown".
-    """
-    import subprocess
-    root = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    try:
-        head = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=root,
-            capture_output=True, text=True, timeout=10, check=True,
-        ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=root,
-            capture_output=True, text=True, timeout=10, check=True,
-        ).stdout.strip()
-    except Exception:
-        return "unknown"
-    if not head:
-        return "unknown"
-    return head + ("+dirty" if dirty else "")
-
-
-def _stale_code_warning(boot_rev, now_rev):
-    """None when the tree matches boot, else a plain-language warning.
-
-    "unknown" on either side means "cannot tell" — warn too, because an
-    unverifiable runner is no better than a stale one for this purpose.
-    """
-    if not boot_rev or not now_rev:
-        return "Could not determine the server's code revision."
-    if "unknown" in (boot_rev, now_rev):
-        return ("Could not verify the server is running current code "
-                "(revision unknown) — restart the desk before trusting "
-                "this analysis to reflect the latest fixes.")
-    if boot_rev != now_rev:
-        return (f"Server code changed since boot (booted at {boot_rev}, tree "
-                f"is now {now_rev}) — this analysis ran the booted code, "
-                "not the current tree. Restart the desk and re-run.")
-    return None
 
 
 # Stamped once at import (= process boot): every analysis this process runs
@@ -1073,45 +1029,6 @@ def _import_cowriter(name: str):
 
 # ---------- config ----------
 
-def create_sample_project():
-    """One-click sample page: create a project from the built-in screenplay.
-    Deduplicates by title — reopening the sample keeps one shelf entry."""
-    from .sample import SAMPLE_TITLE, SAMPLE_SCRIPT
-
-    safe_name = safe_dir_name(SAMPLE_TITLE)  # H2: ASCII fold (sample title is ASCII-safe)
-    project_dir = _project_dir(safe_name)
-    try:
-        # Atomic claim (L5): makedirs IS the test-and-set. The old
-        # `if os.path.exists(...)` / `makedirs(exist_ok=True)` pair let two
-        # concurrent "open the sample" requests both decide the directory was
-        # missing, then interleave two manifests into it. Losing the race means
-        # another request is already creating the sample — and the sample IS
-        # deduplicated by title, so returning theirs is the correct answer.
-        os.makedirs(project_dir)
-    except FileExistsError:
-        try:
-            m = ProjectManifest.load(project_dir)
-            return jsonify(_manifest_summary(m))
-        except Exception:
-            pass  # corrupt dir — fall through and re-create
-
-    tmp_path = os.path.join(project_dir, "_sample.fountain")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        f.write(SAMPLE_SCRIPT)
-
-    try:
-        manifest = ProjectManifest.create(project_dir, tmp_path, title=SAMPLE_TITLE)
-        manifest = _adopt_connection(manifest)
-        manifest.timeout = CONFIG["timeout"]
-        manifest.model_id = CONFIG["model"]
-        manifest.save()
-        os.remove(tmp_path)
-        Orchestrator(manifest).run_parse()
-    except Exception as e:
-        return _error(f"Could not create the sample page: {e}", 500)
-
-    return jsonify(_manifest_summary(manifest)), 201
-
 
 @app.route("/api/projects", methods=["POST"])
 def create_project():
@@ -1657,29 +1574,6 @@ def reparse_project(name):
     return jsonify(_manifest_summary(m))
 
 
-def add_stash(name):
-    try:
-        m = _load_manifest(name)
-    except FileNotFoundError:
-        return _error("Project not found.", 404)
-    body = request.get_json(silent=True) or {}
-    try:
-        entry = add_stash_entry(m.project_dir, body)
-    except ValueError as e:
-        return _error(str(e), 400)
-    return jsonify(entry), 201
-
-
-def add_stash_entry(project_dir: str, body: dict) -> dict:
-    from .stash_store import add_to_stash
-    scene = body.get("scene_number")
-    try:
-        scene = int(scene) if scene is not None else None
-    except (TypeError, ValueError):
-        scene = None
-    return add_to_stash(project_dir, body.get("text") or "", title=body.get("title") or "", scene_number=scene)
-
-
 @app.route("/api/projects/<name>/stash/<entry_id>", methods=["DELETE"])
 def delete_stash_entry(name, entry_id):
     try:
@@ -1831,21 +1725,6 @@ def get_edits(name):
                     # findings). Read, never applied — the desk says so instead
                     # of guessing which finding the writer meant.
                     "ambiguous_marks": ambiguous_marks(m)})
-
-
-def _strip_rewrite_noise(line: str) -> str:
-    """Remove JSON-emit artifacts the model leaks into copied lines. Two shapes:
-    1. trailing punctuation/quote noise ('RAVI stops walking.",",' -> 'RAVI stops walking.')
-    2. structural tokens emitted mid-string when the model breaks its own JSON
-       ('RAVI stops walking.",", "new":' -> 'RAVI stops walking.')
-    Cut at the first structural token sequence; strip trailing junk otherwise."""
-    import re as _re
-    # structural break: quote/comma/backslash run followed by a key like "new":
-    m = _re.search(r'[",\\\s]*(new|old|note)"?\s*:\s*"?$', line)
-    if m:
-        line = line[:m.start()]
-    # residual escape/punct tails at the very end
-    return _re.sub(r'[",\'\\]+$', "", line.rstrip()).rstrip()
 
 
 @app.route("/api/projects/<name>/rewrite", methods=["POST"])
@@ -3778,8 +3657,6 @@ def _page_update_note(last_seen, current):
     return "\n\n".join(parts)
 
 
-
-
 # ---------- humanization v2: deterministic mood + the doctor's case file ----------
 #
 # Both are COMPUTED, never model-improvised: the personas color their energy
@@ -4785,8 +4662,6 @@ def create_sample_project():
     return jsonify(_manifest_summary(manifest)), 201
 
 
-
-
 @app.route("/api/projects/<name>/stash", methods=["POST"])
 def add_stash(name):
     try:
@@ -4809,8 +4684,6 @@ def add_stash_entry(project_dir: str, body: dict) -> dict:
     except (TypeError, ValueError):
         scene = None
     return add_to_stash(project_dir, body.get("text") or "", title=body.get("title") or "", scene_number=scene)
-
-
 
 
 # ---------- register route blueprints ----------

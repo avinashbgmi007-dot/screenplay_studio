@@ -1,6 +1,8 @@
 """API route blueprint."""
 from flask import Blueprint, jsonify, request
 
+from screenplay_studio.state import state
+
 api_bp = Blueprint("api_routes", __name__)
 
 
@@ -8,7 +10,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/test-connection", methods=["POST"])
     def test_connection():
-        from screenplay_studio.state import state
         body = request.get_json() or {}
         url = (body.get("server_url") or state.CONFIG["server_url"]).rstrip("/")
         # This route GETs {url}/v1/models for whatever it is handed, so it is an
@@ -39,7 +40,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/real-server-check", methods=["GET"])
     def real_server_check():
-        from screenplay_studio.state import state
         """While the demo fallback is active: is the writer's real llama-server
         back? Drives the status strip's click-to-switch affordance."""
         if not state._DEMO_MODEL_ACTIVE:
@@ -62,7 +62,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/health", methods=["GET"])
     def health():
-        from screenplay_studio.state import state
         return jsonify({"status": "ok", "server_url": state.CONFIG.get("server_url"),
                         "demo_model": state._DEMO_MODEL_ACTIVE,
                         "code_rev": state._CODE_REV_AT_STARTUP})
@@ -72,7 +71,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/rules/<rule_id>", methods=["GET"])
     def get_rule(rule_id):
-        from screenplay_studio.state import state
         """spec §7: a card may claim "grounded in knowledge-base rule <id>", so the
         desk has to be able to answer *says who?*. This is a read of the shipped
         knowledge base — no model call, and an id that isn't a rule is a 404 rather
@@ -92,7 +90,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/config", methods=["GET"])
     def get_config():
-        from screenplay_studio.state import state
         cfg = state.CONFIG.to_dict()
         # The token is a secret and this response is readable by any page that can
         # reach the desk. Report only WHETHER one is set; the value never leaves.
@@ -125,7 +122,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/config", methods=["POST"])
     def set_config():
-        from screenplay_studio.state import state
         body = request.get_json() or {}
         # ---- the mode switch (see `connection_mode` above) ---------------------
         # "remote" is refused while the process opt-in is off. That is the whole
@@ -190,7 +186,6 @@ def register_api_routes(bp):
     @bp.route("/api/projects", methods=["GET"])
     def list_projects():
         import os
-        from screenplay_studio.state import state
         if not os.path.isdir(state.PROJECTS_DIR):
             return jsonify([])
         out = []
@@ -231,7 +226,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/projects/<name>", methods=["GET"])
     def get_project(name):
-        from screenplay_studio.state import state
         try:
             m = state._load_manifest(name)
         except FileNotFoundError:
@@ -251,7 +245,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/projects/<name>/report", methods=["GET"])
     def get_report(name):
-        from screenplay_studio.state import state
         try:
             m = state._load_manifest(name)
         except FileNotFoundError:
@@ -273,7 +266,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/projects/<name>/passes", methods=["GET"])
     def get_pass_history(name):
-        from screenplay_studio.state import state
         """spec §15.4: the revision arc — one entry per analysis this project has had.
 
         The store's own contract answers a damaged file (the global StoreUnreadable
@@ -292,7 +284,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/projects/<name>/characters", methods=["GET"])
     def get_character_tracks(name):
-        from screenplay_studio.state import state
         """Per-character track layer — presence, traits, interactions, reads —
         assembled from the knowledge graph + report. Instant (no model calls)."""
         try:
@@ -316,7 +307,6 @@ def register_api_routes(bp):
 
     @bp.route("/api/projects/<name>/stash", methods=["GET"])
     def get_stash(name):
-        from screenplay_studio.state import state
         try:
             m = state._load_manifest(name)
         except FileNotFoundError:
