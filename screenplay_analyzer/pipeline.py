@@ -942,6 +942,35 @@ def _tag_evidence(findings, source: str):
     return findings
 
 
+def _verify_scene_refs(findings, doc) -> None:
+    """Correct scene_refs that point at the wrong scene: if a finding carries a
+    quote, the quote must live in one of the cited scenes. When it doesn't,
+    search all scenes for the quote and re-point scene_refs at the scene that
+    actually contains it (or clear them when no scene contains it). Findings
+    without a quote are left untouched."""
+    scenes = getattr(doc, "scenes", None) or []
+    scene_text = {getattr(sc, "scene_number", i + 1): _scene_full_text(sc)
+                  for i, sc in enumerate(scenes)}
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        quote = f.get("evidence_quote")
+        if not quote or not isinstance(quote, str):
+            continue
+        q = quote.strip().strip("\"'").lower()
+        if len(q) < 6:
+            continue
+        # which scenes contain the quote?
+        hits = [sn for sn, txt in scene_text.items()
+                if q in (txt or "").lower()]
+        if not hits:
+            continue
+        cited = set(f.get("scene_refs") or [])
+        if cited and cited.issubset(set(hits)):
+            continue  # already correct
+        f["scene_refs"] = sorted(hits)
+
+
 def evidence_depth(findings) -> dict:
     """How much of the report rests on the pages, and how much on a summary of
     them. `unknown` is kept visible rather than folded into either side: a pass
@@ -1801,6 +1830,12 @@ def analyze(
     # before the verification summary and the evidence depth so every downstream
     # count describes the set the writer actually receives.
     before_dedup = len(result.findings)
+    # 8a5. verify scene citations: a quote must live in its cited scene.
+    try:
+        _verify_scene_refs(result.findings, doc)
+    except Exception as e:
+        result.errors.append(f"Scene-ref verification skipped: {e}")
+
     try:
         from .dedupe import dedupe_related_findings
         result.findings = dedupe_related_findings(result.findings)
