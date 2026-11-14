@@ -1518,6 +1518,40 @@ def analyze(
             result.category_outcomes["dialogue"] = "failed"
             result.errors.append(f"Dialogue analysis failed: {e}")
 
+    # 4c. character-perception read — how each character comes across to a
+    # stranger vs. apparent intent. Needs the overview + character list; runs
+    # after the character arc pass so the deterministic stats are ready.
+    _cp()
+    if "char_reads" in run_categories and overview:
+        try:
+            emit("char_reads", "running", "Reading how characters come across")
+            retries_used = {"n": 0}
+
+            def _char_retry(n, exc):
+                retries_used["n"] = n
+                emit("char_reads", "running", f"Model hiccup on the character read — retrying ({n})")
+
+            result.character_reads = run_character_reads(
+                doc, overview, client,
+                _top_characters(result.stats, doc),
+                language=report_language,
+                on_retry=_char_retry,
+            )
+            result.category_outcomes["char_reads"] = "ok"
+            if retries_used["n"]:
+                # M2: the retry succeeded — say so. A pass that silently ate a
+                # 2s/5s retry looked identical to a clean one; the writer had
+                # no way to know the read wobbled and recovered.
+                result.notices.append(
+                    f"The character-perception read hit a model hiccup but recovered on retry "
+                    f"#{retries_used['n']} — no findings were lost."
+                )
+            emit("char_reads", "complete")
+        except LlamaServerError as e:
+            result.category_outcomes["char_reads"] = "failed"
+            result.errors.append(f"Character-perception read failed: {e}")
+            emit("char_reads", "complete", f"failed: {e}")
+
     # 4. script-level categories
     category_prompts = {
         "theme": (prompts.theme_analysis_prompt, (script_level_overview, doc.title)),
@@ -1526,6 +1560,11 @@ def analyze(
         "scene_function": (prompts.scene_function_prompt, (script_level_overview, doc.title)),
     }
     for cat, (fn, args) in category_prompts.items():
+        # Gate character findings on the perception read: if the read came back
+        # empty, don't generate orphaned character findings in the first place.
+        if cat == "character" and "char_reads" in run_categories and not result.character_reads:
+            result.category_outcomes["character"] = "skipped"
+            continue
         if cat in run_categories and overview:
             _cp()
             try:
@@ -1570,39 +1609,6 @@ def analyze(
             result.errors.append(f"Principles engine failed: {e}")
             emit("principles", "complete", f"failed: {e}")
 
-    # 4c. character-perception read — how each character comes across to a
-    # stranger vs. apparent intent. Needs the overview + character list; runs
-    # after the character arc pass so the deterministic stats are ready.
-    _cp()
-    if "char_reads" in run_categories and overview:
-        try:
-            emit("char_reads", "running", "Reading how characters come across")
-            retries_used = {"n": 0}
-
-            def _char_retry(n, exc):
-                retries_used["n"] = n
-                emit("char_reads", "running", f"Model hiccup on the character read — retrying ({n})")
-
-            result.character_reads = run_character_reads(
-                doc, overview, client,
-                _top_characters(result.stats, doc),
-                language=report_language,
-                on_retry=_char_retry,
-            )
-            result.category_outcomes["char_reads"] = "ok"
-            if retries_used["n"]:
-                # M2: the retry succeeded — say so. A pass that silently ate a
-                # 2s/5s retry looked identical to a clean one; the writer had
-                # no way to know the read wobbled and recovered.
-                result.notices.append(
-                    f"The character-perception read hit a model hiccup but recovered on retry "
-                    f"#{retries_used['n']} — no findings were lost."
-                )
-            emit("char_reads", "complete")
-        except LlamaServerError as e:
-            result.category_outcomes["char_reads"] = "failed"
-            result.errors.append(f"Character-perception read failed: {e}")
-            emit("char_reads", "complete", f"failed: {e}")
         except Exception as e:
             result.category_outcomes["char_reads"] = "failed"
             result.errors.append(f"Character-perception read failed: {e}")

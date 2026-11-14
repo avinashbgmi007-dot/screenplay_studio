@@ -33,6 +33,17 @@ OBSERVATION_INSTRUCTION = (
     "inventing one. "
 )
 
+SEVERITY_RUBRIC = (
+    "Severity must reflect craft impact, not your confidence. "
+    "high = breaks the story's promise or makes a scene unreadable (e.g. a "
+    "protagonist with no want, a climax that doesn't confront the central conflict). "
+    "medium = a real weakness a rewrite should address (e.g. a flat midpoint, "
+    "exposition disguised as dialogue). "
+    "low = a polish note or open question (e.g. a line that could be sharper). "
+    "If every finding is 'low', say so honestly rather than inflating one to "
+    "'medium' for balance. "
+)
+
 CITATION_INSTRUCTION = (
     OBSERVATION_INSTRUCTION
     + "For every finding, split your observation into two fields: 'issue' (a short, "
@@ -43,6 +54,10 @@ CITATION_INSTRUCTION = (
     "copied directly from that scene's text that supports the finding. "
     "If a finding isn't tied to specific quotable text, set evidence_quote to null. "
     "Never paraphrase inside evidence_quote — it must be verbatim or it will be rejected. "
+    "Scene citation honesty: if you cannot tie a finding to a specific scene, set "
+    "scene_refs to [] and say so in 'issue' ('not tied to a specific scene'). "
+    "Never fabricate a scene number to make a finding look grounded. "
+    + SEVERITY_RUBRIC +
     "If a specific named principle below grounds this finding, set rule_id to that "
     "principle's id; otherwise set rule_id to null. "
     "Diagnosis only — do not propose fixes or suggest how to resolve the issue; "
@@ -62,7 +77,12 @@ CITATION_INSTRUCTION_SUMMARY = (
     "is your citation, and it's what lets someone go verify the finding directly. You "
     "are working from scene SUMMARIES below, not the original screenplay text, so you "
     "have not seen the actual dialogue/action lines — always set evidence_quote to "
-    "null. Do not invent a quote. If a specific named principle below grounds this "
+    "null. Do not invent a quote. "
+    "Scene citation honesty: if you cannot tie a finding to a specific scene, set "
+    "scene_refs to [] and say so in 'issue' ('not tied to a specific scene'). "
+    "Never fabricate a scene number. "
+    + SEVERITY_RUBRIC +
+    "If a specific named principle below grounds this "
     "finding, set rule_id to that principle's id; otherwise set rule_id to null. "
     "Diagnosis only — do not propose fixes or suggest how to resolve the issue; "
     "that happens in a separate conversation, not in this report."
@@ -171,7 +191,6 @@ def dialogue_analysis_prompt(scenes_chunk: list[dict], rules_fragment: str = "",
         "between scenes with no dramatic reason (a deliberate register shift under "
         "pressure is fine; a voice that silently swaps is a draft artifact). "
         f"{CITATION_INSTRUCTION} Use category \"dialogue\" for dialogue/action findings. "
-        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -188,7 +207,6 @@ def theme_analysis_prompt(scene_overview: str, title: str, rules_fragment: str =
         "entire screenplay.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"theme\" for all findings. "
-        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -203,7 +221,6 @@ def character_analysis_prompt(scene_overview: str, title: str, characters: list[
         "don't force findings for minor characters.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"character\" for all findings. "
-        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -232,7 +249,6 @@ def structure_analysis_prompt(scene_overview: str, title: str, total_scenes: int
         "midpoint on purpose, so judge by whether the story earns its own shape, not by "
         "a formula.\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"structure\" for all findings. "
-        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -302,7 +318,6 @@ def scene_function_prompt(scene_overview: str, title: str, rules_fragment: str =
         "missing is a candidate for the cut or the merge — name which of the three "
         "is missing in the finding.\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"scene_function\" for all findings. "
-        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
