@@ -4490,6 +4490,15 @@ function renderFixQueuePanel(container) {
       flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
       rowFlags.push(flag);
     }
+    if (item.summary_only) {
+      // the fourth demotion flag: a scene note with no quote summarises the
+      // scene instead of pointing at a line, so it is an opinion about the
+      // scene rather than a cited defect. Was set by the pipeline and dropped
+      // by the row builder until the row carried all four.
+      const flag = el("span", "row-flag row-flag-summary", "summary");
+      flag.title = "A scene note with no quote — it summarises the scene instead of pointing at a line";
+      rowFlags.push(flag);
+    }
     if (item.ungrounded) {
       const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
       flag.title = "No quote or checkable observation backs this note yet";

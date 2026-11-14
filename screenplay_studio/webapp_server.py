@@ -2262,10 +2262,16 @@ def _fixqueue_items(m):
             # Gate 11: the falsifiable observation a grounded finding rests on.
             # Delivered so the checkable half of a note is not report-only.
             "observation": f.get("observation"),
-            # Accuracy kit A: the desk default-hides ungrounded rows, so the
-            # flag must ride the row like evidence_quote does.
+            # All four demotion flags ride the row (Accuracy kit A, completed).
+            # The builder shipped only `ungrounded`/`contested`, so a
+            # `summary_only` note — grounded enough to escape the ungrounded
+            # filter — reached the desk unmarked, and `identity_uncertain`'s
+            # `identity?` chip was dead code. bool() keeps a missing key from
+            # ever reading as truthy in `if (item.flag)`.
             "ungrounded": bool(f.get("ungrounded")),
             "contested": bool(f.get("contested")),
+            "summary_only": bool(f.get("summary_only")),
+            "identity_uncertain": bool(f.get("identity_uncertain")),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 

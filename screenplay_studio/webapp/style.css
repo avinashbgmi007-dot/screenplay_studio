@@ -1931,6 +1931,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 .row-flag-contested { color: var(--sev-mid-text); border-color: color-mix(in oklab, var(--sev-mid) 50%, transparent); }
 .row-flag-identity { color: var(--text-muted); border-color: color-mix(in oklab, var(--text-muted) 50%, transparent); }
+.row-flag-summary { color: var(--text-muted); border-color: color-mix(in oklab, var(--text-muted) 50%, transparent); border-style: dashed; }
 .row-flag-ungrounded { color: var(--text-muted); border-style: dashed; }
 .act-chip {
   font-family: var(--font-mono);
