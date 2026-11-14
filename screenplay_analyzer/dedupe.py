@@ -341,11 +341,6 @@ def _norm_issue(f: dict) -> str:
     return re.sub(r"\s+", " ", str(f.get("issue") or "")).strip().lower()
 
 
-def _finding_text(f: dict) -> str:
-    parts = [f.get("issue"), f.get("observation"), f.get("evidence_quote")]
-    return " ".join(p for p in parts if p)
-
-
 def _cosine(a, b) -> float:
     import math
     if not a or not b or len(a) != len(b):
@@ -384,14 +379,6 @@ def _extract_groups(reply) -> list[list[int]]:
                 g = _extract_groups(reply[key])
                 if g:
                     return g
-        # single-pair / boolean forms
-        if "merge" in reply or "same" in reply or "duplicate" in reply or "overlap" in reply:
-            val = reply.get("merge", reply.get("same", reply.get("duplicate",
-                  reply.get("overlap", reply.get("is_duplicate")))))
-            # if it's a truthy scalar, caller must have passed exactly 2 findings;
-            # we can't know indices here, so signal via a sentinel handled by caller
-            if isinstance(val, bool):
-                return [["__PAIR__", val]]
         # maybe the dict maps index->index
         if all(isinstance(k, str) and k.isdigit() for k in reply) and all(
                 isinstance(v, int) for v in reply.values()):
@@ -430,15 +417,12 @@ def _llm_merge_groups(findings, client) -> list[list[int]]:
         reply = client.chat_json(system, user)
     except Exception:
         return []
+    # Boolean single-pair form: {"merge": true} (only meaningful for 2 findings)
+    if isinstance(reply, dict) and len(findings) == 2:
+        for key in ("merge", "same", "duplicate", "overlap", "is_duplicate"):
+            if key in reply and isinstance(reply[key], bool):
+                return [[0, 1]] if reply[key] else []
     groups = _extract_groups(reply)
-    # handle sentinel pair form
-    if groups == [["__PAIR__", True]]:
-        # only meaningful for exactly two findings
-        if len(findings) == 2:
-            return [[0, 1]]
-        return []
-    if groups == [["__PAIR__", False]]:
-        return []
     # validate indices
     valid = []
     for g in groups:
@@ -535,8 +519,15 @@ def dedupe_cross_category(findings: list[dict], kb=None, client=None,
         if not isinstance(g, (list, tuple)):
             continue
         idxs = [x for x in g if isinstance(x, int) and 0 <= x < n]
-        for k in range(1, len(idxs)):
-            union.union(idxs[0], idxs[k])
+        # Only merge cross-category pairs; same-category merges belong to
+        # dedupe_related_findings / the integrity gate, not this pass.
+        for a in range(len(idxs)):
+            for b in range(a + 1, len(idxs)):
+                i, j = idxs[a], idxs[b]
+                ci = (findings[i].get("category") or "").lower()
+                cj = (findings[j].get("category") or "").lower()
+                if ci != cj and ci in cats and cj in cats:
+                    union.union(i, j)
     # Also handle LLM groups that already are components (already unioned above).
 
     groups: dict[int, list[int]] = {}
