@@ -475,6 +475,10 @@ def coverage_prompt(scene_overview: str, title: str, author: str, language: str 
         "used by studios and agencies to quickly assess a screenplay. Be honest and "
         "specific, not generically positive. recommendation must be exactly one of "
         "\"pass\", \"consider\", or \"recommend\". "
+        "You MUST populate every field of the schema: logline (one sentence), "
+        "genre (single genre label), tone, one_page_synopsis, strengths (array), "
+        "weaknesses (array), comparable_films (array), recommendation. "
+        "Do not return a single \"coverage\" summary field instead. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )

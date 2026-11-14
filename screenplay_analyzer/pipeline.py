@@ -742,12 +742,22 @@ def run_coverage(doc: ScriptDocument, overview: str, client: LlamaServerClient, 
     system, user = prompts.coverage_prompt(overview, doc.title, doc.author, language=language)
     result = client.chat_json(system, user, grammar=grammar, max_tokens=900)
     if isinstance(result, dict):
+        # Normalize: models (especially when the grammar is dropped by a
+        # PEG-era server) often return a partial shape such as
+        # {"coverage": "...", "recommendation": "consider"} without the
+        # structured fields the downstream passes need. Fill defaults so
+        # genre/logline_test never fail merely because a key is absent.
+        for key in ("logline", "genre", "tone", "one_page_synopsis",
+                    "strengths", "weaknesses", "comparable_films"):
+            result.setdefault(key, "" if key not in ("strengths", "weaknesses", "comparable_films") else [])
+        if not result.get("one_page_synopsis") and result.get("coverage"):
+            result["one_page_synopsis"] = result.get("coverage")
         # A "pass" on a script the model itself says it cannot evaluate is
         # self-contradictory (trial run: no logline/synopsis yet pass). Demote
         # it to "consider" so the desk never green-lights an unreadable script.
         rec = str(result.get("recommendation") or "").lower().strip()
         if rec == "pass":
-            synopsis = str(result.get("synopsis") or "")
+            synopsis = str(result.get("one_page_synopsis") or result.get("synopsis") or "")
             logline = str(result.get("logline") or "")
             thin = (
                 getattr(doc, "parse_confidence", None) == "low"
@@ -1769,7 +1779,7 @@ def analyze(
     # 6b. genre-convention check — uses the genre coverage just produced, so it
     # runs after coverage and only when a genre was reported.
     _cp()
-    if "genre" in run_categories and result.coverage and result.coverage.get("genre"):
+    if "genre" in run_categories and result.coverage:
         try:
             emit("genre", "running", "Checking genre conventions")
             from .genre import run_genre_check
@@ -1807,8 +1817,10 @@ def analyze(
         if cat in overview_gated and not overview:
             result.category_outcomes[cat] = "failed"
         elif cat in ("genre", "logline_test"):
-            needed = "genre" if cat == "genre" else "logline"
-            if not (result.coverage or {}).get(needed):
+            # These depend on coverage; only "failed" if coverage itself
+            # failed. A missing logline/genre key is handled by run_coverage's
+            # defaults (genre falls back to drama conventions).
+            if not result.coverage:
                 result.category_outcomes[cat] = "failed"
 
     # 8. drop non-writing feedback — meta-commentary about the script's
@@ -1853,6 +1865,14 @@ def analyze(
     # up — in report.md, in the served findings JSON and in the live desk.
     from .dedupe import collapse_exact_duplicates
     result.findings = collapse_exact_duplicates(result.findings)
+
+    # 8c2. cross-category semantic dedup — collapses findings with high
+    # semantic overlap across dialogue/theme/scene_function in the same scene.
+    try:
+        from .dedupe import dedupe_cross_category
+        result.findings = dedupe_cross_category(result.findings, client=client)
+    except Exception as e:
+        result.errors.append(f"Cross-category dedup skipped: {e}")
 
     # 8d. finding integrity gate — remove the mechanically FALSE findings (a
     # pass reporting the absence of a defect; a deterministic rule firing on

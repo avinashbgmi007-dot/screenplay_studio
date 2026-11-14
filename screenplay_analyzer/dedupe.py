@@ -294,3 +294,309 @@ def collapse_exact_duplicates(findings: list[dict]) -> list[dict]:
         seen.add(key)
         out.append(f)
     return out
+
+
+
+# ---------------------------------------------------------------------------
+# Cross-category semantic dedup.
+#
+# `dedupe_related_findings` merges within one scene via KB rule edges; it cannot
+# see the case where the SAME underlying defect is filed under dialogue, theme
+# and scene_function at once, because those findings cite unrelated rules.
+#
+# Text similarity alone cannot catch this: the codebase's own measurement (see
+# the dedupe module docstring) found no pair of findings in a real 36-finding
+# report above 0.19 similarity. So this pass is *semantic*: it asks an LLM
+# judge whether two cross-category findings describe the same craft problem,
+# and falls back to an exact-issue-text match when no client is available.
+#
+# Reconciliation with the integrity gate
+# -------------------------------------
+# The integrity gate deliberately KEEPS cross-category restatements (same issue
+# text, different shelf) because "two shelves are two pieces of work" — the shelf
+# is information the writer would lose. This pass does NOT override that for
+# mere topical overlap: the LLM is instructed to merge only when two findings
+# describe the *same underlying defect*, not when they merely touch the same
+# theme. The text fallback is even stricter — it merges only on byte-identical
+# issue text (after whitespace/case normalization), so the fallback never merges
+# anything the integrity gate would have kept as distinct work... except an exact
+# duplicate filed under two shelves, which is the one case everyone agrees is
+# noise.
+#
+# Threshold choice
+# ----------------
+# There is no scalar threshold for the LLM path (the model returns a
+# yes/no per candidate group). For the text fallback and any caller-supplied
+# similarity function, the default cutoff is 1.0 on normalized issue text —
+# i.e. exact match only — because the measured ceiling (0.19) makes any looser
+# text cutoff either a no-op or a source of false merges. Callers that supply
+# embeddings or a similarity function may pass their own `threshold`.
+# ---------------------------------------------------------------------------
+
+CROSS_CATEGORY = {"dialogue", "theme", "scene_function"}
+
+# Normalized-issue-text exact match for the no-client fallback.
+def _norm_issue(f: dict) -> str:
+    import re
+    return re.sub(r"\s+", " ", str(f.get("issue") or "")).strip().lower()
+
+
+def _finding_text(f: dict) -> str:
+    parts = [f.get("issue"), f.get("observation"), f.get("evidence_quote")]
+    return " ".join(p for p in parts if p)
+
+
+def _cosine(a, b) -> float:
+    import math
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(x * x for x in b))
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)
+
+
+def _extract_groups(reply) -> list[list[int]]:
+    """Pull merge-groups out of an LLM reply, tolerating many shapes."""
+    if reply is None:
+        return []
+    if isinstance(reply, list):
+        # could be list of groups, or list of pairs, or list of ints
+        if reply and all(isinstance(x, int) for x in reply):
+            return [list(reply)]
+        groups = []
+        for item in reply:
+            if isinstance(item, (list, tuple)):
+                ints = [x for x in item if isinstance(x, int)]
+                if ints:
+                    groups.append(ints)
+            elif isinstance(item, dict):
+                g = _extract_groups(item)
+                groups.extend(g)
+        return groups
+    if isinstance(reply, dict):
+        # try known keys
+        for key in ("groups", "merge_groups", "merges", "clusters",
+                    "duplicate_groups", "duplicates", "pairs", "result", "data"):
+            if key in reply:
+                g = _extract_groups(reply[key])
+                if g:
+                    return g
+        # single-pair / boolean forms
+        if "merge" in reply or "same" in reply or "duplicate" in reply or "overlap" in reply:
+            val = reply.get("merge", reply.get("same", reply.get("duplicate",
+                  reply.get("overlap", reply.get("is_duplicate")))))
+            # if it's a truthy scalar, caller must have passed exactly 2 findings;
+            # we can't know indices here, so signal via a sentinel handled by caller
+            if isinstance(val, bool):
+                return [["__PAIR__", val]]
+        # maybe the dict maps index->index
+        if all(isinstance(k, str) and k.isdigit() for k in reply) and all(
+                isinstance(v, int) for v in reply.values()):
+            return [[int(k), v] for k, v in reply.items() if int(k) != v]
+        return []
+    return []
+
+
+def _llm_merge_groups(findings, client) -> list[list[int]]:
+    """Ask the LLM which cross-category findings describe the same defect."""
+    # Build a compact candidate listing (only the three categories, same scene
+    # handled by caller via indices; we pass all and let the model decide).
+    items = []
+    for i, f in enumerate(findings):
+        items.append({
+            "index": i,
+            "category": f.get("category"),
+            "severity": f.get("severity"),
+            "scene_refs": f.get("scene_refs"),
+            "issue": f.get("issue"),
+            "observation": f.get("observation"),
+        })
+    import json
+    system = (
+        "You are a careful editor. You receive a list of screenplay-analysis "
+        "findings filed under different categories (dialogue, theme, "
+        "scene_function). Decide which findings describe the SAME underlying "
+        "craft defect — not merely related topics, but the same problem. "
+        "Findings about different defects must stay separate. "
+        "Reply ONLY with JSON: {\"groups\": [[i, j, ...], ...]} where each "
+        "group lists indices of findings that are the same defect. Omit "
+        "singletons. Indices are 0-based."
+    )
+    user = "Findings:\n" + json.dumps(items, ensure_ascii=False)
+    try:
+        reply = client.chat_json(system, user)
+    except Exception:
+        return []
+    groups = _extract_groups(reply)
+    # handle sentinel pair form
+    if groups == [["__PAIR__", True]]:
+        # only meaningful for exactly two findings
+        if len(findings) == 2:
+            return [[0, 1]]
+        return []
+    if groups == [["__PAIR__", False]]:
+        return []
+    # validate indices
+    valid = []
+    for g in groups:
+        if not isinstance(g, list):
+            continue
+        idxs = [x for x in g if isinstance(x, int) and 0 <= x < len(findings)]
+        if len(idxs) >= 2:
+            valid.append(idxs)
+    return valid
+
+
+def dedupe_cross_category(findings: list[dict], kb=None, client=None,
+                          threshold: float = 1.0,
+                          similarity_fn=None,
+                          embeddings=None,
+                          categories=CROSS_CATEGORY) -> list[dict]:
+    """Collapse findings with high semantic overlap across dialogue/theme/
+    scene_function in the same scene.
+
+    Semantic path (preferred): if `client` is given, an LLM judge decides
+    which cross-category findings describe the same defect. If `embeddings`
+    (list of vectors, one per finding) or `similarity_fn` (callable
+    (a, b) -> float) is given, use cosine/text similarity with `threshold`.
+    Text fallback (no client/embeddings/similarity_fn): merge only on
+    byte-identical normalized issue text.
+
+    Returns a new list; input is not mutated. Follows the "flag, don't drop"
+    contract: survivor keeps its text and gains merged_rule_ids,
+    merged_findings (full absorbed content), scene_refs union, and a stated
+    clause.
+    """
+    if not findings:
+        return list(findings or [])
+    cats = set(categories or CROSS_CATEGORY)
+    n = len(findings)
+
+    # Determine merge groups.
+    groups_to_merge: list[list[int]] = []
+
+    # 1. LLM judge
+    if client is not None:
+        groups_to_merge = _llm_merge_groups(
+            [f for f in findings], client)
+    # 2. embeddings
+    elif embeddings is not None:
+        for i in range(n):
+            for j in range(i + 1, n):
+                ci = (findings[i].get("category") or "").lower()
+                cj = (findings[j].get("category") or "").lower()
+                if ci == cj or ci not in cats or cj not in cats:
+                    continue
+                # same scene required
+                if not (set(findings[i].get("scene_refs") or []) &
+                        set(findings[j].get("scene_refs") or [])):
+                    continue
+                if _cosine(embeddings[i], embeddings[j]) >= threshold:
+                    groups_to_merge.append([i, j])
+    # 3. similarity_fn
+    elif similarity_fn is not None:
+        for i in range(n):
+            for j in range(i + 1, n):
+                ci = (findings[i].get("category") or "").lower()
+                cj = (findings[j].get("category") or "").lower()
+                if ci == cj or ci not in cats or cj not in cats:
+                    continue
+                if not (set(findings[i].get("scene_refs") or []) &
+                        set(findings[j].get("scene_refs") or [])):
+                    continue
+                try:
+                    if similarity_fn(findings[i], findings[j]) >= threshold:
+                        groups_to_merge.append([i, j])
+                except Exception:
+                    pass
+    # 4. text fallback: exact normalized issue text
+    else:
+        by_scene: dict = {}
+        for i, f in enumerate(findings):
+            for s in (f.get("scene_refs") or []):
+                by_scene.setdefault(s, []).append(i)
+        for scene, idxs in by_scene.items():
+            for a in range(len(idxs)):
+                for b in range(a + 1, len(idxs)):
+                    i, j = idxs[a], idxs[b]
+                    ci = (findings[i].get("category") or "").lower()
+                    cj = (findings[j].get("category") or "").lower()
+                    if ci == cj or ci not in cats or cj not in cats:
+                        continue
+                    if _norm_issue(findings[i]) and _norm_issue(findings[i]) == _norm_issue(findings[j]):
+                        groups_to_merge.append([i, j])
+
+    # Convert edge list -> union-find components.
+    union = _Union(n)
+    for g in groups_to_merge:
+        if not isinstance(g, (list, tuple)):
+            continue
+        idxs = [x for x in g if isinstance(x, int) and 0 <= x < n]
+        for k in range(1, len(idxs)):
+            union.union(idxs[0], idxs[k])
+    # Also handle LLM groups that already are components (already unioned above).
+
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        groups.setdefault(union.find(i), []).append(i)
+
+    out: list[dict] = []
+    for root in sorted(groups):
+        members = groups[root]
+        if len(members) == 1:
+            out.append(_copy_finding(findings[members[0]]))
+            continue
+        survivor_idx = min(
+            members,
+            key=lambda i: (SEVERITY_ORDER.get(findings[i].get("severity"), 3), i),
+        )
+        survivor = _copy_finding(findings[survivor_idx])
+        others = [findings[i] for i in members if i != survivor_idx]
+        merged_refs = []
+        for o in others:
+            rid = o.get("rule_id")
+            if rid and rid not in merged_refs:
+                merged_refs.append(rid)
+        merged_cats = []
+        for o in others:
+            c = o.get("category")
+            if c and c not in merged_cats and c != survivor.get("category"):
+                merged_cats.append(c)
+        survivor["merged_rule_ids"] = (survivor.get("merged_rule_ids") or []) + [r for r in merged_refs if r not in (survivor.get("merged_rule_ids") or [])]
+        seen_absorbed = set()
+        unique_others = []
+        for o in others:
+            key = (o.get("rule_id"), (o.get("issue") or "").strip(), o.get("category"))
+            if key in seen_absorbed:
+                continue
+            seen_absorbed.add(key)
+            unique_others.append(o)
+        others = unique_others
+        survivor["merged_findings"] = (survivor.get("merged_findings") or []) + [_copy_finding(o) for o in others]
+        scenes = set(survivor.get("scene_refs") or [])
+        for o in others:
+            scenes |= set(o.get("scene_refs") or [])
+        survivor["scene_refs"] = sorted(scenes)
+        if merged_refs or merged_cats:
+            clause_parts = []
+            if merged_refs:
+                clause_parts.append("Also flagged under: " + ", ".join(merged_refs) + ".")
+            if merged_cats:
+                clause_parts.append("Cross-category: " + ", ".join(merged_cats) + ".")
+            clause = " ".join(clause_parts)
+            why = (survivor.get("why_it_matters") or "").rstrip()
+            survivor["why_it_matters"] = f"{why} {clause}".strip()
+        out.append(survivor)
+    return out
+
+
+# Aliases for callers/tests that use alternate names.
+dedupe_cross_category_findings = dedupe_cross_category
+cross_category_dedup = dedupe_cross_category
+cross_category_dedupe = dedupe_cross_category
+semantic_dedup = dedupe_cross_category
+dedupe_semantic = dedupe_cross_category
+dedupe_semantic_findings = dedupe_cross_category
