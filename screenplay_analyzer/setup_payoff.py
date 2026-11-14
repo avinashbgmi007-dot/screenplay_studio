@@ -222,19 +222,17 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
             continue  # already reported by the Principles Engine
         label = "Setup left dangling" if e.get("status") == "dangling" else "Setup abandoned"
         scenes = e.get("setup_scenes") or []
-        # Resolve a missing scene citation against the script instead of
-        # emitting a finding that "isn't tied to a specific scene". Drop the
-        # entry when no scene can be found — an ungrounded dangling note is
-        # worse than no note.
+        # Resolve a missing scene citation against the script when possible;
+        # otherwise keep the entry (scene_refs []) so the dangling setup is
+        # still surfaced instead of silently dropped. The desk already labels
+        # scene_refs [] as "not tied to a specific scene".
         if not scenes and doc is not None:
             terms = _content_terms(setup)
             ok, at = _terms_in_scenes(terms, doc,
                                       [s.scene_number for s in (doc.scenes or [])])
             if ok and at is not None:
                 scenes = [at]
-            else:
-                continue
-        e["setup_scenes"] = scenes
+                e["setup_scenes"] = scenes
         quote = _setup_quote(e, doc) if doc is not None else None
         findings.append({
             "category": "plot_thread",

@@ -943,20 +943,6 @@ def apply_evidence_floor(result_or_findings) -> None:
         from .feedback_filter import is_refuted, demote_contested
         if not f.get("ungrounded") and is_refuted(f):
             demote_contested(f)
-    # Severity calibration: a report where every finding is "low" is unreadable.
-    # If nothing earned a medium/high and at least one finding is grounded,
-    # promote the first grounded finding so the desk has a real anchor.
-    if not any(str(f.get("severity") or "").lower() in ("high", "medium")
-               for f in (findings or []) if isinstance(f, dict)):
-        promoted = 0
-        for f in (findings or []):
-            if not isinstance(f, dict):
-                continue
-            if f.get("evidence_quote") or f.get("observation"):
-                f["severity"] = "medium"
-                promoted += 1
-                if promoted >= 3:
-                    break
 
 
 _IDENTITY_PATTERNS = [
@@ -1604,12 +1590,6 @@ def analyze(
                 on_retry=_char_retry,
             )
             result.category_outcomes["char_reads"] = "ok"
-            # Stop emitting orphaned character findings: if the perception read
-            # came back empty, the character-category findings have no backing
-            # read and are dropped rather than shipped unbacked.
-            if not result.character_reads:
-                all_findings[:] = [f for f in all_findings
-                                   if f.get("category") != "character"]
             if retries_used["n"]:
                 # M2: the retry succeeded — say so. A pass that silently ate a
                 # 2s/5s retry looked identical to a clean one; the writer had

@@ -171,6 +171,7 @@ def dialogue_analysis_prompt(scenes_chunk: list[dict], rules_fragment: str = "",
         "between scenes with no dramatic reason (a deliberate register shift under "
         "pressure is fine; a voice that silently swaps is a draft artifact). "
         f"{CITATION_INSTRUCTION} Use category \"dialogue\" for dialogue/action findings. "
+        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -187,6 +188,7 @@ def theme_analysis_prompt(scene_overview: str, title: str, rules_fragment: str =
         "entire screenplay.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"theme\" for all findings. "
+        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -201,6 +203,7 @@ def character_analysis_prompt(scene_overview: str, title: str, characters: list[
         "don't force findings for minor characters.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"character\" for all findings. "
+        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -229,6 +232,7 @@ def structure_analysis_prompt(scene_overview: str, title: str, total_scenes: int
         "midpoint on purpose, so judge by whether the story earns its own shape, not by "
         "a formula.\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"structure\" for all findings. "
+        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
@@ -298,6 +302,7 @@ def scene_function_prompt(scene_overview: str, title: str, rules_fragment: str =
         "missing is a candidate for the cut or the merge — name which of the three "
         "is missing in the finding.\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"scene_function\" for all findings. "
+        "Return at most 6 findings — only the most consequential; do not pad with minor notes. "
         f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )

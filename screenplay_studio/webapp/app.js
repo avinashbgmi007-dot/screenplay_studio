@@ -4397,7 +4397,7 @@ function renderFixQueuePanel(container) {
   // away (flag-don't-drop) — mirrors the dismissed toggle below. Built once
   // because the empty branch needs it too: an all-ungrounded queue must still
   // offer the way back.
-  const ungroundedCount = items.filter((i) => i.ungrounded || i.capped).length;
+  const ungroundedCount = items.filter((i) => i.ungrounded).length;
   const maybeAddUngroundedToggle = (head) => {
     if (!ungroundedCount) return;
     const showU = !!state.fixQueueShowUngrounded;
@@ -7783,7 +7783,7 @@ function queueCounts(items) {
     // the ledger's totals exactly like dismissed rows do — same counter.
     // Writer-dispositioned rows bypass (mirrors queueRowVisible): parking or
     // finishing a note is the writer's own workflow, not a groundedness claim.
-    if ((item.ungrounded || item.capped) && !state.fixQueueShowUngrounded
+    if (item.ungrounded && !state.fixQueueShowUngrounded
         && d !== "addressed" && d !== "deferred") continue;
     c.total += 1;
     if (d === "open") c.open += 1;
