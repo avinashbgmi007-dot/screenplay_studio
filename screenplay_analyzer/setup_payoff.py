@@ -304,6 +304,25 @@ def adjudicate_ledger(entries: list, doc) -> list:
         if not isinstance(e, dict):
             continue
         terms = _content_terms(e.get("setup"))
+        # If the model omitted a scene citation, try to ground the setup
+        # from its own terms before declaring it ungrounded: search every
+        # scene and, on a hit, record that scene as the setup scene. This
+        # keeps a genuinely-present setup from being flagged ungrounded
+        # merely because the model forgot to cite where it lives.
+        if terms and not (e.get("setup_scenes") or []):
+            # Grounding pass (lenient: a single content term is enough to
+            # place the setup, since labels like "Time-pressure/Alarm" carry
+            # only one real content word). Search all scenes.
+            from screenplay_parser.quotematch import find_scene_text as _fst
+            from screenplay_analyzer.verifier import _normalize as _norm
+            at = None
+            for sc in (doc.scenes or []):
+                txt = _norm(_fst(doc, sc.scene_number) or "")
+                if any(_norm(t) in txt for t in terms if _norm(t)):
+                    at = sc.scene_number
+                    break
+            if at is not None:
+                e["setup_scenes"] = [at]
         setup_ok, setup_at = _terms_in_scenes(
             terms, doc, e.get("setup_scenes") or [])
         if terms and not setup_ok:
