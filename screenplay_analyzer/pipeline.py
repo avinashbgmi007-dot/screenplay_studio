@@ -1560,11 +1560,6 @@ def analyze(
         "scene_function": (prompts.scene_function_prompt, (script_level_overview, doc.title)),
     }
     for cat, (fn, args) in category_prompts.items():
-        # Gate character findings on the perception read: if the read came back
-        # empty, don't generate orphaned character findings in the first place.
-        if cat == "character" and "char_reads" in run_categories and not result.character_reads:
-            result.category_outcomes["character"] = "skipped"
-            continue
         if cat in run_categories and overview:
             _cp()
             try:
