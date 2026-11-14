@@ -230,8 +230,23 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
         survivor = _copy_finding(findings[survivor_idx])
         others = [findings[i] for i in members if i != survivor_idx]
 
-        merged_refs = [o.get("rule_id") for o in others if o.get("rule_id")]
+        merged_refs = []
+        for o in others:
+            rid = o.get("rule_id")
+            if rid and rid not in merged_refs:
+                merged_refs.append(rid)
         survivor["merged_rule_ids"] = merged_refs
+        # Dedupe absorbed findings by (rule_id, issue) so a rule cited twice
+        # does not appear twice in the inspectable merge trail.
+        seen_absorbed = set()
+        unique_others = []
+        for o in others:
+            key = (o.get("rule_id"), (o.get("issue") or "").strip())
+            if key in seen_absorbed:
+                continue
+            seen_absorbed.add(key)
+            unique_others.append(o)
+        others = unique_others
         # The absorbed findings' FULL content, not only their rule names. A rule
         # id says "another rule agreed"; it does not say WHAT that rule said —
         # and the absorbed `issue`, `observation`, `evidence_quote` and `severity`

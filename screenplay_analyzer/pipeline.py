@@ -948,12 +948,15 @@ def apply_evidence_floor(result_or_findings) -> None:
     # promote the first grounded finding so the desk has a real anchor.
     if not any(str(f.get("severity") or "").lower() in ("high", "medium")
                for f in (findings or []) if isinstance(f, dict)):
+        promoted = 0
         for f in (findings or []):
             if not isinstance(f, dict):
                 continue
             if f.get("evidence_quote") or f.get("observation"):
                 f["severity"] = "medium"
-                break
+                promoted += 1
+                if promoted >= 3:
+                    break
 
 
 _IDENTITY_PATTERNS = [
@@ -1210,6 +1213,21 @@ def apply_absence_and_caps(findings: list, page_count) -> None:
         for i, f in enumerate(findings):
             if i not in keep:
                 f["capped"] = True
+    # Per-category cap on short scripts: no category should dominate a
+    # 6-page script. Excess is flagged (not dropped).
+    if short:
+        _rank = {"high": 0, "medium": 1, "low": 2}
+        by_cat = {}
+        for i, f in enumerate(findings):
+            if not isinstance(f, dict):
+                continue
+            by_cat.setdefault(str(f.get("category") or ""), []).append(i)
+        for cat, idxs in by_cat.items():
+            if len(idxs) <= 5:
+                continue
+            ordered = sorted(idxs, key=lambda i: (_rank.get(str(findings[i].get("severity") or "low").lower(), 3), i))
+            for i in ordered[5:]:
+                findings[i]["capped"] = True
             f["severity"] = "low"
     # Similarity clusters within a category: near-identical issue text on
     # distinct anchors is one template filed many times. First rows per
@@ -1586,6 +1604,12 @@ def analyze(
                 on_retry=_char_retry,
             )
             result.category_outcomes["char_reads"] = "ok"
+            # Stop emitting orphaned character findings: if the perception read
+            # came back empty, the character-category findings have no backing
+            # read and are dropped rather than shipped unbacked.
+            if not result.character_reads:
+                all_findings[:] = [f for f in all_findings
+                                   if f.get("category") != "character"]
             if retries_used["n"]:
                 # M2: the retry succeeded — say so. A pass that silently ate a
                 # 2s/5s retry looked identical to a clean one; the writer had
