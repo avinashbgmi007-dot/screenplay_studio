@@ -21,6 +21,12 @@ from __future__ import annotations
 import json
 import os
 
+try:
+    from .context import trust_tags, trust_legend
+except Exception:  # pragma: no cover - context always importable in package
+    trust_tags = None  # type: ignore[assignment]
+    trust_legend = None  # type: ignore[assignment]
+
 LIBRARY_GROUNDING_GUARD = (
     "These are the writer's PAST scripts — a different shelf from what's on "
     "the desk right now. Never merge them with the current script or premise, "
@@ -60,14 +66,32 @@ def build_library(projects_dir: str, exclude: str | None = None, limit: int = 0)
             entries.append({"project": name, "title": name, "unreadable": True})
             continue
         themes = []
+        theme_markers = []
         report_path = os.path.join(d, "report.findings.json")
         if os.path.exists(report_path):
             try:
                 with open(report_path, "r", encoding="utf-8") as f:
                     r = json.load(f)
+                theme_entries = []
                 for fnd in r.get("findings") or []:
                     if fnd.get("category") == "theme" and fnd.get("issue"):
-                        themes.append(fnd["issue"][:120])
+                        issue = fnd["issue"][:120]
+                        tags = []
+                        if callable(trust_tags):
+                            try:
+                                tags = trust_tags(fnd) or []
+                            except Exception:
+                                tags = []
+                        if tags:
+                            issue = f"{issue} [{' · '.join(tags)}]"
+                        theme_entries.append((issue, list(tags)))
+                # Cap after tagging so a marker can never outlive its quote.
+                theme_entries = theme_entries[:4]
+                themes = [t for t, _ in theme_entries]
+                for _, tags in theme_entries:
+                    for tag in tags:
+                        if tag not in theme_markers:
+                            theme_markers.append(tag)
             except (OSError, ValueError):
                 pass
         entries.append({
@@ -77,7 +101,8 @@ def build_library(projects_dir: str, exclude: str | None = None, limit: int = 0)
             "scene_count": p.get("scene_count"),
             "estimated_page_count": p.get("estimated_page_count"),
             "characters": (p.get("all_characters") or [])[:8],
-            "themes": themes[:4],
+            "themes": themes,
+            "theme_markers": theme_markers,
         })
     if limit and len(entries) > limit:
         entries = entries[:limit]
@@ -95,6 +120,21 @@ def library_digest_text(library: list[dict], limit: int = 6) -> str:
     if not library:
         return ""
     lines = ["PAST WORK — other scripts on this writer's shelf (for reference only):"]
+    all_markers = []
+    for e in library[:limit]:
+        for m in (e.get("theme_markers") or []):
+            if m not in all_markers:
+                all_markers.append(m)
+    # Legend only when a past theme actually carries a marker — a clean
+    # shelf stays byte-identical to the pre-trust-state digest.
+    legend = ""
+    if all_markers and callable(trust_legend):
+        try:
+            legend = trust_legend(all_markers) or ""
+        except Exception:
+            legend = ""
+    if legend:
+        lines.append(legend)
     for e in library[:limit]:
         if e.get("unreadable"):
             lines.append(

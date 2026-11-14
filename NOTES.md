@@ -3,6 +3,10 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### 2026-11-14 — writer_library trust-state leak closed
+
+`build_library` now carries each theme finding's trust markers (ungrounded/contested/summary_only/identity_uncertain, plus verification tags) into the quoted theme string as `[ … ]`, and `library_digest_text` adds the conditional `TRUST MARKERS` legend only when a marker is present — a clean shelf stays byte-identical. `theme_markers` added to each entry. Tests: `tests/test_writer_library_trust_state.py` (7, real report via `save_report`).
+
 
 ### 2026-10-11 — Ledger precision done + trial acceptance (D1-D4 follow-ups, full suite 2191)
 

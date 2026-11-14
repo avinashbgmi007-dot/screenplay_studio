@@ -59,7 +59,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `language_mirror.py` | `detect_register`, `mirror_instruction` | Mirrors the writer's register (Tenglish/Hindi/Telugu/English) in replies |
 | `peer.py` | `classify_turn`, `should_probe`, `ensure_forward_momentum`, `cap_suggestions`, `has_embedded_reasoning` | Peer-mode guardrails: probe instead of parrot, forward momentum, suggestion cap |
 | `memory.py` | `WriterMemory`, `build_relationship_card`, `merge_refresh`, `extract_signals`, `apply_signals`, `dimension_gate`, `_migrate_v2` | Writer relationship memory (scoped global/project/idea), notes-on-you card, refresh sync |
-| `writer_library.py` | `build_library`, `library_digest_text` | Past-work digest from every parsed project; rides every turn as PAST WORK (firewalled from current script) |
+| `writer_library.py` | `build_library`, `library_digest_text` | Past-work digest from every parsed project; rides every turn as PAST WORK (firewalled from current script). Theme quotes now carry their trust markers (ungrounded/contested/summary_only/identity_uncertain) plus a conditional legend |
 | `server.py` | `main` + Flask routes | Standalone Flask API (port 8300) |
 | `cli.py` | `main`, `run_repl`, `cmd_chat`, `cmd_list` | `chat`/`list` subcommands + slash commands |
 
