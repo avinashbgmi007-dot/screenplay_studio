@@ -742,6 +742,23 @@ def run_coverage(doc: ScriptDocument, overview: str, client: LlamaServerClient, 
     system, user = prompts.coverage_prompt(overview, doc.title, doc.author, language=language)
     result = client.chat_json(system, user, grammar=grammar, max_tokens=900)
     if isinstance(result, dict):
+        # A "pass" on a script the model itself says it cannot evaluate is
+        # self-contradictory (trial run: no logline/synopsis yet pass). Demote
+        # it to "consider" so the desk never green-lights an unreadable script.
+        rec = str(result.get("recommendation") or "").lower().strip()
+        if rec == "pass":
+            synopsis = str(result.get("synopsis") or "")
+            logline = str(result.get("logline") or "")
+            thin = (
+                getattr(doc, "parse_confidence", None) == "low"
+                or not getattr(doc, "scene_count", 0)
+                or len((overview or "").strip()) < 200
+                or "lack" in synopsis.lower()
+                or not logline.strip()
+                or logline.strip().lower().startswith("no logline")
+            )
+            if thin:
+                result["recommendation"] = "consider"
         return result
     return {}  # model returned a non-object — coverage is unavailable, not fatal
 
@@ -926,6 +943,17 @@ def apply_evidence_floor(result_or_findings) -> None:
         from .feedback_filter import is_refuted, demote_contested
         if not f.get("ungrounded") and is_refuted(f):
             demote_contested(f)
+    # Severity calibration: a report where every finding is "low" is unreadable.
+    # If nothing earned a medium/high and at least one finding is grounded,
+    # promote the first grounded finding so the desk has a real anchor.
+    if not any(str(f.get("severity") or "").lower() in ("high", "medium")
+               for f in (findings or []) if isinstance(f, dict)):
+        for f in (findings or []):
+            if not isinstance(f, dict):
+                continue
+            if f.get("evidence_quote") or f.get("observation"):
+                f["severity"] = "medium"
+                break
 
 
 _IDENTITY_PATTERNS = [
@@ -1171,6 +1199,17 @@ def apply_absence_and_caps(findings: list, page_count) -> None:
         cap = caps.get(str(f.get("category") or ""))
         if cap is not None and seen_anchors[key] > cap:
             f["capped"] = True
+    # Short scripts: cap total delivered findings so a 6-page script does not
+    # ship 40 notes. Excess is flagged (not dropped) per the flag-don't-drop
+    # contract; the desk hides flagged rows by default.
+    if short and len(findings) > 15:
+        _rank = {"high": 0, "medium": 1, "low": 2}
+        order = sorted(range(len(findings)),
+                       key=lambda i: (_rank.get(str(findings[i].get("severity") or "low").lower(), 3), i))
+        keep = set(order[:15])
+        for i, f in enumerate(findings):
+            if i not in keep:
+                f["capped"] = True
             f["severity"] = "low"
     # Similarity clusters within a category: near-identical issue text on
     # distinct anchors is one template filed many times. First rows per
