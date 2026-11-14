@@ -21,11 +21,7 @@ from __future__ import annotations
 import json
 import os
 
-try:
-    from .context import trust_tags, trust_legend
-except Exception:  # pragma: no cover - context always importable in package
-    trust_tags = None  # type: ignore[assignment]
-    trust_legend = None  # type: ignore[assignment]
+from .context import trust_tags, trust_legend
 
 LIBRARY_GROUNDING_GUARD = (
     "These are the writer's PAST scripts — a different shelf from what's on "
@@ -76,12 +72,7 @@ def build_library(projects_dir: str, exclude: str | None = None, limit: int = 0)
                 for fnd in r.get("findings") or []:
                     if fnd.get("category") == "theme" and fnd.get("issue"):
                         issue = fnd["issue"][:120]
-                        tags = []
-                        if callable(trust_tags):
-                            try:
-                                tags = trust_tags(fnd) or []
-                            except Exception:
-                                tags = []
+                        tags = trust_tags(fnd) or []
                         if tags:
                             issue = f"{issue} [{' · '.join(tags)}]"
                         theme_entries.append((issue, list(tags)))
@@ -127,12 +118,7 @@ def library_digest_text(library: list[dict], limit: int = 6) -> str:
                 all_markers.append(m)
     # Legend only when a past theme actually carries a marker — a clean
     # shelf stays byte-identical to the pre-trust-state digest.
-    legend = ""
-    if all_markers and callable(trust_legend):
-        try:
-            legend = trust_legend(all_markers) or ""
-        except Exception:
-            legend = ""
+    legend = trust_legend(all_markers) if all_markers else ""
     if legend:
         lines.append(legend)
     for e in library[:limit]:
