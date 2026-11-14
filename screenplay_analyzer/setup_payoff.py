@@ -283,6 +283,16 @@ def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
             return True, n
         if _token_overlap(" ".join(sorted(terms)), tnorm) >= 0.5:
             return True, n
+        # Fallback: each content term must appear as a substring of the
+        # normalised scene text. The fuzzy/overlap paths above fail when the
+        # setup string carries digits or short words that the haystack keeps
+        # (e.g. "Inka 3 mints" vs "inka3mints"), even though every content
+        # word is genuinely present. Require a majority of terms.
+        if terms:
+            norm_terms = [_normalize(t) for t in terms]
+            hits = sum(1 for nt in norm_terms if nt and nt in tnorm)
+            if hits >= max(1, (len(norm_terms) + 1) // 2):
+                return True, n
     return False, None
 
 
