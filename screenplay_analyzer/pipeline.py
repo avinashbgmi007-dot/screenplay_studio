@@ -908,10 +908,37 @@ EVIDENCE_OVERVIEW = "overview"     # read the model's scene summaries
 EVIDENCE_OVERVIEW_AND_CHECKPOINTS = "overview+checkpoints"
 
 
+def _normalize_scene_ref(r):
+    if isinstance(r, bool):
+        return None
+    if isinstance(r, int):
+        return r
+    if isinstance(r, str):
+        s = r.strip()
+        # Accept "Scene 3", "scene 3", "3", "Scenes 1,2" -> first int
+        import re as _re
+        m = _re.search(r"\d+", s)
+        if m:
+            try:
+                return int(m.group(0))
+            except ValueError:
+                return None
+    return None
+
+
 def _tag_evidence(findings, source: str):
-    """Stamp each finding with the evidence its pass actually read."""
+    """Stamp each finding with the evidence its pass actually read, and
+    normalize scene_refs to ints so downstream dedup/display agree."""
     for f in findings:
         f["evidence_source"] = source
+        refs = f.get("scene_refs")
+        if isinstance(refs, list):
+            norm = []
+            for r in refs:
+                nr = _normalize_scene_ref(r)
+                if nr is not None and nr not in norm:
+                    norm.append(nr)
+            f["scene_refs"] = norm
     return findings
 
 
@@ -1559,6 +1586,7 @@ def analyze(
         "structure": (prompts.structure_analysis_prompt, (script_level_overview, doc.title, doc.scene_count, doc.estimated_page_count)),
         "scene_function": (prompts.scene_function_prompt, (script_level_overview, doc.title)),
     }
+    _prior_issues = []
     for cat, (fn, args) in category_prompts.items():
         if cat in run_categories and overview:
             _cp()
@@ -1570,9 +1598,15 @@ def analyze(
                     or reveal_context_block(result.reveal_candidates)
                 if _reveal_block:
                     rules_fragment = (rules_fragment + "\n\n" + _reveal_block) if rules_fragment else _reveal_block
-                all_findings.extend(_tag_evidence(
-                    run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language),
-                    script_level_source))
+                # Cross-pass coordination: don't restate what earlier passes flagged.
+                if _prior_issues:
+                    _coord = ("\n\nAlready flagged by earlier passes (do NOT repeat "
+                              "these or restate them under a new category):\n- " +
+                              "\n- ".join(_prior_issues[-15:]))
+                    rules_fragment = (rules_fragment + _coord) if rules_fragment else _coord.strip()
+                _cat_findings = run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language)
+                _prior_issues.extend(f.get("issue", "") for f in (_cat_findings or []) if isinstance(f, dict) and f.get("issue"))
+                all_findings.extend(_tag_evidence(_cat_findings, script_level_source))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"
             except LlamaServerError as e:
