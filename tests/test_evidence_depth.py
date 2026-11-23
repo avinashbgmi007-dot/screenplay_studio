@@ -116,12 +116,13 @@ class TestEveryPassDeclaresItsSource:
         src = self._src()
         assert "drag_findings(result.pacing), EVIDENCE_FULL_TEXT)" in src
         assert "run_script_level_category(fn, client, rules_fragment" in src
-        # Scoped to the call itself: `.*?` under re.S will happily run to a later
-        # `EVIDENCE_OVERVIEW)` in the file, so the window is bounded by the tag's
-        # own closing paren. (The loose version of this regex passed on code that
-        # had already stopped matching it — a guard that could not fail.)
+        # The current implementation keeps the category result in a local before
+        # tagging it. Keep the guard scoped to that pass so category-based tagging
+        # cannot accidentally make pacing and structure share a source.
         assert re.search(
-            r"_tag_evidence\(\s*run_script_level_category\([^)]*\),\s*script_level_source\)",
+            r"_cat_findings\s*=\s*run_script_level_category\([^)]*\)"
+            r"[\s\S]{0,400}?all_findings\.extend\(_tag_evidence\("
+            r"\s*_cat_findings,\s*script_level_source\)\)",
             src, re.S,
         ), "the script-level categories must be tagged with the pass-level source"
         assert ("script_level_source = (EVIDENCE_OVERVIEW_AND_CHECKPOINTS if checkpoint_scenes"

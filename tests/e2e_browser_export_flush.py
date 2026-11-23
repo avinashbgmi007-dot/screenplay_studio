@@ -1,6 +1,6 @@
 """Browser e2e for the two behaviors that previously shipped without live proof:
 
-A) The 📥 Report export button appears in the Feedback room once a report
+A) The report export button appears in the project's overflow menu once a report
    exists, points at /report/export, and actually downloads.
 B) Closing the tab within the autosave debounce still persists the typed
    idea content (pagehide -> sendBeacon flush).
@@ -186,6 +186,13 @@ def main() -> None:
             page.locator("#overflow-toggle").click()
             page.wait_for_timeout(400)
             rep = page.locator("#export-report")
+            # The report arrives after several independent project reads. Wait
+            # for the actual affordance rather than assuming a fixed network
+            # duration; still fail the check if it never becomes available.
+            try:
+                rep.wait_for(state="visible", timeout=5000)
+            except Exception:
+                pass
             offered = rep.is_visible()
             ok("the overflow menu offers the report export", offered)
             rhref = (rep.get_attribute("href") or "") if offered else ""
