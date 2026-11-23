@@ -15,16 +15,46 @@ class TestConventionLookup:
         conv = conventions_for("  Romance ")
         assert conv == GENRE_CONVENTIONS["romance"]
 
-    def test_substring_genre(self):
+    def test_hybrid_genre_combines_conventions(self):
         conv = conventions_for("romantic comedy")
-        assert conv == GENRE_CONVENTIONS["comedy"]
+        assert conv == GENRE_CONVENTIONS["comedy"] + GENRE_CONVENTIONS["romance"]
 
-    def test_unknown_genre_falls_back(self):
-        conv = conventions_for("weird experimental")
-        assert conv == GENRE_CONVENTIONS["drama"]
+    def test_science_fiction_hybrid_combines_conventions(self):
+        conv = conventions_for("Sci-Fi Thriller")
+        assert conv == GENRE_CONVENTIONS["sci-fi"] + GENRE_CONVENTIONS["thriller"]
 
-    def test_empty_genre_falls_back(self):
-        assert conventions_for("") == GENRE_CONVENTIONS["drama"]
+    def test_neo_noir_uses_mystery_and_thriller_conventions(self):
+        conv = conventions_for("Neo-noir")
+        assert conv == GENRE_CONVENTIONS["mystery"] + GENRE_CONVENTIONS["thriller"]
+
+    def test_unknown_genre_has_no_conventions(self):
+        assert conventions_for("weird experimental") == []
+
+    def test_empty_genre_has_no_conventions(self):
+        assert conventions_for("") == []
+
+    def test_conventions_and_kb_share_hybrid_routing(self):
+        from knowledge_base import KnowledgeBase
+        from screenplay_analyzer.rules_context import RulesContext
+
+        label = "Romantic Comedy"
+        assert KnowledgeBase.resolve_genres(label) == ("comedy", "romance")
+        rule_genres = {rule.genre for rule in RulesContext().rules_for_genre(label)}
+        assert {"comedy", "romance"} <= rule_genres
+        assert conventions_for(label) == (
+            GENRE_CONVENTIONS["comedy"] + GENRE_CONVENTIONS["romance"]
+        )
+
+    def test_unknown_genre_skips_the_model_check(self):
+        from screenplay_analyzer.genre import run_genre_check
+
+        class UnexpectedClient:
+            def chat_json(self, *args, **kwargs):
+                raise AssertionError("unknown genre should not trigger a model call")
+
+        assert run_genre_check(
+            {"genre": "interpretive dance documentary"}, "overview", UnexpectedClient()
+        ) == []
 
 
 class TestGenreInPipeline:

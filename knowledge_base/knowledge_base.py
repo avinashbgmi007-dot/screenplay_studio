@@ -107,24 +107,37 @@ class KnowledgeBase:
     def for_taxonomy_level(self, level: str) -> list:
         return [r for r in self._rules.values() if r.taxonomy_level == level]
 
-    # Common ways a model words a genre, mapped to the single lowercase token
-    # the knowledge base tags rules with.
+    # Common ways a model words a genre, mapped to canonical KB tags. A
+    # hybrid label can intentionally resolve to more than one genre.
     _GENRE_ALIASES = {
-        "sciencefiction": "scifi",
-        "sf": "scifi",
-        "scifi": "scifi",
-        "romcom": "romance",
-        "romanticcomedy": "romance",
-        "romantic": "romance",
-        "spy": "thriller",
-        "suspense": "thriller",
-        "psychologicalthriller": "thriller",
-        "crime": "mystery",
-        "detective": "mystery",
-        "whodunit": "mystery",
-        "supernatural": "horror",
-        "period": "drama",
+        "sciencefiction": ("scifi",),
+        "sf": ("scifi",),
+        "scifi": ("scifi",),
+        "romcom": ("comedy", "romance"),
+        "romanticcomedy": ("comedy", "romance"),
+        "romantic": ("romance",),
+        "dramedy": ("comedy", "drama"),
+        "noir": ("mystery", "thriller"),
+        "spy": ("thriller",),
+        "suspense": ("thriller",),
+        "psychologicalthriller": ("thriller",),
+        "crime": ("mystery",),
+        "detective": ("mystery",),
+        "whodunit": ("mystery",),
+        "supernatural": ("horror",),
+        "period": ("drama",),
     }
+    _GENRE_PHRASES = {
+        ("science", "fiction"): ("scifi",),
+        ("sci", "fi"): ("scifi",),
+        ("romantic", "comedy"): ("comedy", "romance"),
+        ("psychological", "thriller"): ("thriller",),
+        ("neo", "noir"): ("mystery", "thriller"),
+    }
+    _CANONICAL_GENRES = (
+        "action", "comedy", "drama", "horror", "mystery", "romance",
+        "scifi", "thriller", "western", "fantasy",
+    )
 
     @staticmethod
     def _norm_genre(text: str) -> str:
@@ -132,42 +145,54 @@ class KnowledgeBase:
         stored tag "scifi" normalise to the same key."""
         return re.sub(r"[^a-z0-9]", "", (text or "").lower())
 
-    def for_genre(self, genre: str) -> list:
-        """Return rules tagged with this genre (genre-specific rules only).
+    @classmethod
+    def resolve_genres(cls, genre: str) -> tuple[str, ...]:
+        """Resolve a free-text label to known canonical genres.
 
-        Matching is deliberately tolerant. The caller passes whatever the
-        coverage pass reported, and `genre` is unconstrained free text in the
-        coverage grammar — so the model may answer "Romantic Comedy", "Sci-Fi
-        Thriller", "Psychological Thriller". The previous exact-match lookup
-        (`r.genre == genre.strip().lower()`) returned [] for every such label,
-        which silently disabled genre-scoped grounding for real-world answers.
+        Exact aliases preserve established mappings, while whole-token and
+        explicit phrase matching supports hybrids without accidental
+        substring matches. Unknown labels resolve to an empty tuple.
         """
         if not genre or not str(genre).strip():
-            return []
-        want = self._norm_genre(genre)
+            return ()
+        text = str(genre).lower()
+        want = cls._norm_genre(text)
         if not want:
+            return ()
+        if want in cls._GENRE_ALIASES:
+            return cls._GENRE_ALIASES[want]
+
+        tokens = re.findall(r"[a-z0-9]+", text)
+        found = set()
+        for token in tokens:
+            if token in cls._CANONICAL_GENRES:
+                found.add(token)
+            if token in cls._GENRE_ALIASES:
+                found.update(cls._GENRE_ALIASES[token])
+
+        for phrase, mapped in cls._GENRE_PHRASES.items():
+            width = len(phrase)
+            if any(tuple(tokens[i:i + width]) == phrase
+                   for i in range(len(tokens) - width + 1)):
+                found.update(mapped)
+
+        return tuple(tag for tag in cls._CANONICAL_GENRES if tag in found)
+
+    def for_genre(self, genre: str) -> list:
+        """Return rules for every recognized genre in a free-text label.
+
+        Both aliases and compound labels use ``resolve_genres`` so the same
+        routing decision can drive convention guidance and KB grounding.
+        Unknown labels intentionally return no genre-scoped rules.
+        """
+        genres = set(self.resolve_genres(genre))
+        if not genres:
             return []
-        by_tag: dict = {}
-        for r in self._rules.values():
-            tag = self._norm_genre(getattr(r, "genre", "") or "")
-            if tag:
-                by_tag.setdefault(tag, []).append(r)
-        if not by_tag:
-            return self.for_file(f"{want}.json")
-        # 1. exact (normalised) match, after alias resolution
-        for candidate in (want, self._GENRE_ALIASES.get(want, "")):
-            if candidate and candidate in by_tag:
-                return by_tag[candidate]
-        # 2. one label contains the other ("scifi" vs "scifithriller")
-        for tag, rules in by_tag.items():
-            if tag in want or want in tag:
-                return rules
-        # 3. alias of a contained tag ("psychologicalthriller" -> thriller)
-        for tag, rules in by_tag.items():
-            if self._GENRE_ALIASES.get(tag, "") and self._GENRE_ALIASES[tag] in want:
-                return rules
-        # 4. fallback: rules from genre-named files (e.g. horror.json -> horror)
-        return self.for_file(f"{want}.json")
+        # The KB stores the science-fiction tag as "scifi"; all other
+        # canonical genre names already match the stored tags.
+        kb_tags = {"scifi" if tag == "scifi" else tag for tag in genres}
+        return [r for r in self._rules.values()
+                if self._norm_genre(getattr(r, "genre", "") or "") in kb_tags]
 
     def for_file(self, filename: str) -> list:
         """Return all rules from a specific JSON file."""
