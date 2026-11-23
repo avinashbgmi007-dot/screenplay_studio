@@ -26,6 +26,28 @@ from screenplay_parser.quotematch import (
 # calling a real quote fabricated is the expensive error here.
 FUZZY_MATCH_THRESHOLD = 0.72
 
+
+def _normalize_scene_refs(scene_refs):
+    """Normalize only clear numeric scene citations; report malformed refs."""
+    import re
+    if scene_refs is None:
+        return [], []
+    values = scene_refs if isinstance(scene_refs, (list, tuple)) else [scene_refs]
+    normalized = []
+    invalid = []
+    for value in values:
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            normalized.append(value)
+            continue
+        if isinstance(value, str):
+            raw = value.strip()
+            match = re.fullmatch(r"(?:Scene\\s+)?([0-9]+)", raw, flags=re.IGNORECASE)
+            if match and int(match.group(1)) > 0:
+                normalized.append(int(match.group(1)))
+                continue
+        invalid.append(value)
+    return list(dict.fromkeys(normalized)), invalid
+
 # _normalize, _scene_full_text and _best_fuzzy_match are ALIASES, not wrappers.
 # The primitives live in screenplay_parser.quotematch so that the studio's
 # status engine (revision.quote_present) shares them: the two engines used to
@@ -43,13 +65,21 @@ FUZZY_MATCH_THRESHOLD = 0.72
 def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
     """
     Mutates and returns the finding dict with a `verification` block:
-      {status: "verified" | "not_found" | "no_quote" | "scene_not_found",
-       matched_scene: int | null, confidence: float}
+      {status: "verified" | "not_found" | "no_quote" | "scene_not_found"
+       | "invalid_scene_ref", matched_scene: int | null, confidence: float}
     """
     quote = finding.get("evidence_quote")
-    scene_refs = finding.get("scene_refs") or []
+    raw_scene_refs = finding.get("scene_refs") or []
+    scene_refs, invalid_scene_refs = _normalize_scene_refs(raw_scene_refs)
 
     def _quoteless() -> dict:
+        if invalid_scene_refs:
+            finding["verification"] = {
+                "status": "invalid_scene_ref", "matched_scene": None,
+                "confidence": None,
+                "note": f"Malformed scene reference(s) were not normalized: {invalid_scene_refs!r}.",
+            }
+            return finding
         # A quote-less finding cites SCENE NUMBERS instead (theme/character/
         # structure/scene_function reason from summaries, so prompts force
         # evidence_quote to null). Those numbers are the finding's only
@@ -66,6 +96,13 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
         finding["verification"] = {"status": "no_quote", "matched_scene": None, "confidence": None}
         return finding
 
+    if invalid_scene_refs:
+        finding["verification"] = {
+            "status": "invalid_scene_ref", "matched_scene": None,
+            "confidence": None,
+            "note": f"Malformed scene reference(s) were not normalized: {invalid_scene_refs!r}.",
+        }
+        return finding
     if not quote or not quote.strip():
         return _quoteless()
 
@@ -104,7 +141,7 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
         # number" hallucination and lets the report correct it instead of just
         # rejecting it.
         for scene in doc.scenes:
-            scene_norm = _normalize("\n".join(e.text for e in scene.elements))
+            scene_norm = _normalize("\\n".join(e.text for e in scene.elements))
             if quote_norm in scene_norm:
                 finding["verification"] = {
                     "status": "verified",
@@ -124,7 +161,7 @@ def verify_findings(findings: list[dict], doc: ScriptDocument) -> list[dict]:
 
 def _norm_name(text: str) -> str:
     import re
-    return re.sub(r"\s+", " ", str(text or "").upper().replace("_", " ")).strip()
+    return re.sub(r"\\s+", " ", str(text or "").upper().replace("_", " ")).strip()
 
 
 def verify_observation(finding: dict, doc) -> bool | None:
@@ -143,8 +180,8 @@ def verify_observation(finding: dict, doc) -> bool | None:
     observation = finding.get("observation") or ""
     if not observation.strip():
         return None
-    scene_refs = finding.get("scene_refs") or []
-    if not scene_refs:
+    scene_refs, invalid_scene_refs = _normalize_scene_refs(finding.get("scene_refs") or [])
+    if invalid_scene_refs or not scene_refs:
         return None
 
     cited = [s for s in (doc.scenes or [])
@@ -165,13 +202,13 @@ def verify_observation(finding: dict, doc) -> bool | None:
     for name in known:
         if not name:
             continue
-        if re.search(r"\b" + re.escape(name) + r"\b", obs_norm):
+        if re.search(r"\\b" + re.escape(name) + r"\\b", obs_norm):
             # Lowercase: cited tokens come from _normalize (lowercase), names
             # from _norm_name (upper) — compare in one case.
             if not any(set(name.lower().split()) <= toks for toks in cited_tokens):
                 return False
 
-    for frag in re.findall(r"(?<!\w)\"([^\"]+)\"|(?<!\w)'([^']+)'", observation):
+    for frag in re.findall(r"(?<!\\w)\\\"([^\\\"]+)\\\"|(?<!\\w)'([^']+)'", observation):
         text = (frag[0] or frag[1]).strip()
         if len(text.split()) < 3:
             continue
@@ -190,9 +227,9 @@ def verify_observation(finding: dict, doc) -> bool | None:
                 for s in cited
             )
         if not supported:
-            whole = _normalize("\n".join(
+            whole = _normalize("\\n".join(
                 _scene_full_text(doc, s.scene_number) or "" for s in (doc.scenes or [])))
-            if _best_fuzzy_match(frag_norm, whole) < FUZZY_MATCH_THRESHOLD \
+            if _best_fuzzy_match(frag_norm, whole) < FUZZY_MATCH_THRESHOLD \\
                     and _token_overlap(frag_norm, whole) < 0.5:
                 return False
     return True
@@ -215,7 +252,8 @@ def _token_overlap(frag_norm: str, haystack_norm: str) -> float:
 
 
 def verification_summary(findings: list[dict]) -> dict:
-    counts = {"verified": 0, "not_found": 0, "no_quote": 0, "scene_not_found": 0}
+    counts = {"verified": 0, "not_found": 0, "no_quote": 0,
+              "scene_not_found": 0, "invalid_scene_ref": 0}
     for f in findings:
         status = f.get("verification", {}).get("status", "no_quote")
         counts[status] = counts.get(status, 0) + 1
