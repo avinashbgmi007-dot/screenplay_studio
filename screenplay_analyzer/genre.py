@@ -11,6 +11,8 @@ This is a model-dependent category that runs AFTER coverage, using the genre
 coverage reported — no separate user input needed.
 """
 
+from knowledge_base import KnowledgeBase
+
 GENRE_CONVENTIONS = {
     "thriller": [
         "A credible, escalating threat with real stakes appears early and tightens through the second act",
@@ -76,27 +78,17 @@ GENRE_CONVENTIONS = {
     ],
 }
 
-DEFAULT_GENRE = "drama"
-
-
 def conventions_for(genre: str) -> list[str]:
-    """Best-effort genre match: exact key, then substring/word overlap."""
-    if not genre:
-        return GENRE_CONVENTIONS.get(DEFAULT_GENRE)
-    g = genre.strip().lower()
-    if g in GENRE_CONVENTIONS:
-        return GENRE_CONVENTIONS[g]
-    for key, conv in GENRE_CONVENTIONS.items():
-        if key in g:
-            return conv
-    # word-level fallback
-    words = set(g.split())
-    best, best_score = None, 0
-    for key, conv in GENRE_CONVENTIONS.items():
-        overlap = len(set(key.split()) & words)
-        if overlap > best_score:
-            best, best_score = conv, overlap
-    return best or GENRE_CONVENTIONS.get(DEFAULT_GENRE)
+    """Return conventions for the canonical genre(s) in a free-text label."""
+    conventions = []
+    seen = set()
+    for tag in KnowledgeBase.resolve_genres(genre):
+        key = "sci-fi" if tag == "scifi" else tag
+        for convention in GENRE_CONVENTIONS.get(key, []):
+            if convention not in seen:
+                seen.add(convention)
+                conventions.append(convention)
+    return conventions
 
 
 # Completion budget for the genre check. 1200 truncated the reply mid-JSON on a
@@ -113,6 +105,8 @@ def run_genre_check(coverage: dict, scene_overview: str, client, rules_ctx=None,
     from .prompts import genre_check_prompt
 
     genre = (coverage or {}).get("genre") or ""
+    if not KnowledgeBase.resolve_genres(genre):
+        return []
     conventions = conventions_for(genre)
 
     # Build genre-specific rules fragment from knowledge base
