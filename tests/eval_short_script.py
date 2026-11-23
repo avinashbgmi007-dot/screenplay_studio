@@ -7,23 +7,23 @@ analyzer's own quote-verification statuses separately from human location
 judgments. A located quote is never counted as proof of claim support.
 
 Usage:
-  python tests/eval_short_script.py --script-id sample --pages 12.5 \\
-    --run baseline-1 report-1.json judgments-1.json \\
-    --run baseline-2 report-2.json judgments-2.json
+  python tests/eval_short_script.py eval-manifest.json
+
+Manifest example:
+  {"script_id":"short-a","page_count":12.5,"runs":[
+    {"run_id":"baseline-1","report":"r1/report.findings.json","judgments":"r1/judgments.json"},
+    {"run_id":"baseline-2","report":"r2/report.findings.json","judgments":"r2/judgments.json"}]}
 
 Each judgments JSON contains a `judgments` array. `finding_index` is the
 1-based position in that run's `findings` array. `reviewer_role` is `writer`
-or `independent`. Optional labels:
-
-  truth: correct | partial | wrong
-  quote_location: located_in_cited_scene | wrong_scene | not_found |
-                  not_applicable | unclear
-  claim_support: supports | partially_supports | does_not_support | unclear
-
-Missing labels remain unjudged. `unclear` is reported but excluded from the
-corresponding decisive denominator. Reports at 30 pages or longer are refused;
-this scorecard does not validate feature-length behavior. No writer outcomes
-are inferred or fabricated by this script.
+or `independent`. Labels are `truth` (correct / partial / wrong),
+`quote_location` (located_in_cited_scene / wrong_scene / not_found /
+not_applicable / unclear), and `claim_support` (supports /
+partially_supports / does_not_support / unclear). Missing labels remain
+unjudged. `unclear` is reported but excluded from the corresponding decisive
+denominator. Reports at 30 pages or longer are refused; this scorecard does
+not validate feature-length behavior. No writer outcomes are inferred or
+fabricated by this script.
 """
 from __future__ import annotations
 
