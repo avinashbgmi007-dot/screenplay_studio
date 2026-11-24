@@ -2,24 +2,24 @@
 Setup/Payoff ledger — the end-of-pipeline whole-script audit.
 
 The Principles Engine judges each mechanically-flagged candidate from its
-own mentions alone: "was THIS object/promise significant, and was it paid
-off?" It cannot see the arc. This pass is the complementary view and it runs
-LAST, when the whole script's shape is available: the model gets the
+own mentions alone: "was THIS object significant, and was it paid off?" It
+cannot see the arc. This pass is the complementary view and it runs LAST,
+when the whole script's shape is available: the model gets the
 scene-by-scene overview of the entire screenplay plus the mechanically
-extracted candidate list, and produces a ledger — for every setup it can see
-(seeded candidates AND setups the extractor missed: thematic promises,
-single-scene emphasis that never pays), where it was set up, where (if
-anywhere) it was paid off, and an honest status: paid / dangling / abandoned
-/ red herring.
+extracted candidate list, and produces a model-assessed ledger — for every setup it can see (seeded
+candidates AND setups the extractor missed: thematic promises and single-scene
+emphasis), with cited setup/payoff scenes and a proposed status. These
+assessments remain proposals until a reader judges their narrative meaning.
 
 This is deliberately a diagnosis-only output: the ledger says what's set up
 and what never comes back. Proposing fixes stays in the conversational
 layer, where the writer can ask for it.
 
-Dangling entries are folded back into the findings (category plot_thread,
-rule setup_payoff_general) so they land in the Fix Queue — deduped against
-the Principles Engine's per-candidate findings so the same promise isn't
-reported twice.
+Dangling entries are folded back into findings only while they still carry a
+model-assigned dangling/abandoned status. Mechanical adjudication changes
+unprovable verdicts to `unverified`, because absence of a later mention cannot
+prove that a setup was forgotten. Those entries remain visible in the ledger
+with the model's original assessment and the reason it could not be verified.
 """
 
 from __future__ import annotations
@@ -44,9 +44,9 @@ MAX_LEDGER_ENTRIES = 12
 # dressing seeded noise) — "alarm"/"timer" stay, because a ringing alarm is
 # a beat, while a clock on the wall usually is not.
 _TIME_PATTERNS = [
-    re.compile(r"\b\d+\s*(?:mints?|minutes?|mins?|seconds?|secs?|hours?|hrs?)\b", re.I),
-    re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b(?!\s*(?:AM|PM|am|pm))", re.I),
-    re.compile(r"\b(?:count\s?downs?|deadlines?|ticking|timers?|alarms?)\b", re.I),
+    re.compile(r"[0-9]+[ ]*(?:mints?|minutes?|mins?|seconds?|secs?|hours?|hrs?)", re.I),
+    re.compile(r"[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?(?![ ]*(?:AM|PM))", re.I),
+    re.compile(r"(?:count[ ]?downs?|deadlines?|ticking|timers?|alarms?)", re.I),
 ]
 MAX_TIME_SEEDS = 4
 
@@ -62,10 +62,10 @@ def _seed_candidates(kg, doc=None) -> list[str]:
     seeds = []
     for p in sorted(kg.prop_candidates, key=lambda c: -c.mention_count):
         scenes = ", ".join(f"S{s}" for s in p.scenes_mentioned)
-        seeds.append(f"- OBJECT \"{p.name}\" — mentioned in scenes {scenes}")
+        seeds.append(f'- OBJECT "{p.name}" — mentioned in scenes {scenes}')
     for p in kg.promise_candidates:
         text = (p.text or "").strip()[:120]
-        seeds.append(f"- PROMISE (by {p.character}, scene {p.scene_number}): \"{text}\"")
+        seeds.append(f'- PROMISE (by {p.character}, scene {p.scene_number}): "{text}"')
     seeds.extend(_time_pressure_seeds(doc))
     return seeds
 
@@ -92,7 +92,7 @@ def _time_pressure_seeds(doc) -> list[str]:
             if len(line.split()) < 3:
                 continue
             if any(p.search(line) for p in _TIME_PATTERNS):
-                seeds.append(f"- TIME-PRESSURE (scene {n}): \"{line[:120]}\"")
+                seeds.append(f'- TIME-PRESSURE (scene {n}): "{line[:120]}"')
                 break
         if len(seeds) >= MAX_TIME_SEEDS:
             break
@@ -110,16 +110,18 @@ def run_setup_payoff_ledger(
 ) -> tuple[list[dict], list[str]]:
     """One whole-script call producing the setup/payoff ledger.
 
-    Returns (entries, errors). entries is a list of:
+    Returns (entries, errors). Before adjudication, entries have:
       {setup, kind, setup_scenes, payoff_scenes (list|None), status, note}
-    status is one of paid | dangling | abandoned | red_herring.
+    status is one of paid | dangling | abandoned | red_herring. The later
+    `adjudicate_ledger` pass may change an unprovable model status to
+    `unverified`, preserving the original in `model_status`.
 
     `doc` is optional: when present its scenes contribute time-pressure
     seeds; without it that family is skipped (all existing callers keep
     working).
     """
     seeds = _seed_candidates(kg, doc)
-    seed_block = "\n".join(seeds) if seeds else (
+    seed_block = chr(10).join(seeds) if seeds else (
         "(none mechanically flagged — judge from the overview alone)"
     )
     system, user = prompts.setup_payoff_ledger_prompt(
@@ -199,9 +201,14 @@ def _setup_quote(entry: dict, doc) -> str | None:
 
 def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
                       rules_ctx=None, doc=None) -> list[dict]:
-    """Fold dangling/abandoned ledger entries into findings for the Fix Queue,
-    deduped against existing plot_thread findings (e.g. the Principles
-    Engine's 'Promise never fulfilled' for the same candidate).
+    """Fold adjudicated dangling/abandoned ledger entries into findings for
+    the Fix Queue, deduped against existing plot_thread findings (e.g. the
+    Principles Engine's 'Promise never fulfilled' for the same candidate).
+
+    Entries marked unverified by adjudication are deliberately not promoted
+    into findings: quote-checking the setup cannot prove the absence of a
+    later payoff. Raw legacy entries without a `verified` field retain the
+    previous behavior for callers that do not run adjudication.
 
     `rules_ctx` is optional: when present, the finding takes the cited rule's
     curated severity instead of a flat default, so this pass and the
@@ -214,7 +221,7 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
 
     findings = []
     for e in ledger:
-        if e.get("status") not in ("dangling", "abandoned"):
+        if e.get("status") not in ("dangling", "abandoned") or e.get("verified") is False:
             continue
         setup = (e.get("setup") or "").strip()
         haystack = " ".join(existing_texts)
@@ -222,10 +229,6 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
             continue  # already reported by the Principles Engine
         label = "Setup left dangling" if e.get("status") == "dangling" else "Setup abandoned"
         scenes = e.get("setup_scenes") or []
-        # Resolve a missing scene citation against the script when possible;
-        # otherwise keep the entry (scene_refs []) so the dangling setup is
-        # still surfaced instead of silently dropped. The desk already labels
-        # scene_refs [] as "not tied to a specific scene".
         if not scenes and doc is not None:
             terms = _content_terms(setup)
             ok, at = _terms_in_scenes(terms, doc,
@@ -249,9 +252,6 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
 def _content_terms(text: str) -> set:
     import re
     from screenplay_analyzer.verifier import _STOPWORDS
-    # Ledger setups are model prose ("Rishi's promise to drop something
-    # (Scene 10)"), not script text: scene refs, role words, and digits
-    # would sink every match, so they are stopwords here, not content.
     META = {"scene", "scenes", "sc", "setup", "payoff", "promise",
             "stated", "mentioned", "described"}
     return {w for w in re.sub(r"[^a-z0-9 ]", " ",
@@ -261,13 +261,12 @@ def _content_terms(text: str) -> set:
 
 
 def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
-    """True + first matching scene when the terms land in one cited scene
-    (windowed fuzzy first, token overlap second). Majority is by overlap
-    share (see `_token_overlap`), not a strict count — setup strings are
-    short and scenes are long. Underscores become spaces on the haystack
-    side: script cues read `X_COMPANY`/`GUN_GUY` while setups say
-    `X Company`/`gun guy`, and the shared normaliser keeps `_` (pinned by
-    verifier/status-engine contract tests — do not change it there)."""
+    """True + first matching scene when the terms land in one cited scene.
+
+    Term matching is candidate generation only. It cannot determine whether
+    a later appearance fulfills a promise, closes a thread, or pays off an
+    object setup.
+    """
     from screenplay_analyzer.verifier import (
         _normalize, _best_fuzzy_match, _token_overlap,
         FUZZY_MATCH_THRESHOLD,
@@ -283,11 +282,6 @@ def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
             return True, n
         if _token_overlap(" ".join(sorted(terms)), tnorm) >= 0.5:
             return True, n
-        # Fallback: each content term must appear as a substring of the
-        # normalised scene text. The fuzzy/overlap paths above fail when the
-        # setup string carries digits or short words that the haystack keeps
-        # (e.g. "Inka 3 mints" vs "inka3mints"), even though every content
-        # word is genuinely present. Require a majority of terms.
         if terms:
             norm_terms = [_normalize(t) for t in terms]
             hits = sum(1 for nt in norm_terms if nt and nt in tnorm)
@@ -296,76 +290,108 @@ def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
     return False, None
 
 
+def _mark_unverified(entry: dict) -> None:
+    """Keep the source model assessment separate from mechanical evidence."""
+    if "model_status" not in entry:
+        entry["model_status"] = entry.get("status")
+    if "model_note" not in entry:
+        entry["model_note"] = entry.get("note") or ""
+    if "model_setup_scenes" not in entry:
+        entry["model_setup_scenes"] = list(entry.get("setup_scenes") or [])
+    if "model_payoff_scenes" not in entry:
+        entry["model_payoff_scenes"] = list(entry.get("payoff_scenes") or []) or None
+    entry["status"] = "unverified"
+    entry["verified"] = False
+
+
 def adjudicate_ledger(entries: list, doc) -> list:
-    """Mechanical re-read of every model verdict (accuracy follow-up).
-    Asymmetric: recurrence proves payoff (flip + note), absence proves
-    nothing (keep + mark). Mutates entries in place, returns them."""
+    """Record textual matches without treating recurrence as narrative payoff.
+
+    This pass can locate terms and cite candidate recurrence scenes. It cannot
+    determine whether a later appearance fulfills a promise, closes a thread,
+    or makes an earlier object meaningful. Nor can failure to find terms prove
+    that a setup was abandoned. All model statuses therefore remain auditable
+    proposals, not mechanically verified conclusions. Reprocessing is
+    idempotent: source fields are captured once and derived fields are replaced.
+    """
+    scene_numbers = [s.scene_number for s in (doc.scenes or [])]
     for e in entries or []:
         if not isinstance(e, dict):
             continue
+        _mark_unverified(e)
         terms = _content_terms(e.get("setup"))
-        # If the model omitted a scene citation, try to ground the setup
-        # from its own terms before declaring it ungrounded: search every
-        # scene and, on a hit, record that scene as the setup scene. This
-        # keeps a genuinely-present setup from being flagged ungrounded
-        # merely because the model forgot to cite where it lives.
-        if terms and not (e.get("setup_scenes") or []):
-            # Grounding pass (lenient: a single content term is enough to
-            # place the setup, since labels like "Time-pressure/Alarm" carry
-            # only one real content word). Search all scenes.
-            from screenplay_parser.quotematch import find_scene_text as _fst
-            from screenplay_analyzer.verifier import _normalize as _norm
-            at = None
-            for sc in (doc.scenes or []):
-                txt = _norm(_fst(doc, sc.scene_number) or "")
-                if any(_norm(t) in txt for t in terms if _norm(t)):
-                    at = sc.scene_number
-                    break
-            if at is not None:
-                e["setup_scenes"] = [at]
-        setup_ok, setup_at = _terms_in_scenes(
-            terms, doc, e.get("setup_scenes") or [])
-        if terms and not setup_ok:
-            e["setup_ungrounded"] = True
-            e["verified"] = False
-            e["verify_note"] = "setup terms not found in the cited setup scenes"
-            continue
-        if e.get("status") == "paid":
-            # Chronological sanity, same rule as the dangling branch: a cited
-            # payoff scene at or before the setup is confusion, not a payoff
-            # (trial rerun: sc17 setup "paid" via a sc4 mention). Such scenes
-            # are dropped from the check, never trusted.
-            setup_after = max(e.get("setup_scenes") or [0])
-            cited = [n for n in (e.get("payoff_scenes") or []) if n > setup_after] \
-                if e.get("setup_scenes") else (e.get("payoff_scenes") or [])
-            ok, at = _terms_in_scenes(terms, doc, cited)
-            e["verified"] = bool(ok)
-            e["verify_note"] = (
-                f"payoff terms recur in scene {at}" if ok
-                else "payoff scenes carry no matching terms (kept: absence proves nothing)")
-            if not ok:
-                e["payoff_unproven"] = True
-        elif e.get("status") in ("dangling", "abandoned"):
-            # Narrative order only: a payoff must come AFTER its setup. Any
-            # earlier recurrence is backstory or coincidence, never a payoff
-            # (trial rerun: sc17 setup "paid" via a sc4 mention).
-            setup_after = max(e.get("setup_scenes") or [0])
-            if e.get("setup_scenes"):
-                later = [s.scene_number for s in (doc.scenes or [])
-                         if s.scene_number > setup_after]
+        model_setup = list(e.get("model_setup_scenes") or [])
+        model_payoff = list(e.get("model_payoff_scenes") or [])
+        e["candidate_setup_scenes"] = []
+        e["candidate_recurrence_scenes"] = []
+        e.pop("setup_ungrounded", None)
+        e.pop("payoff_unproven", None)
+        e.pop("setup_citation_missing", None)
+        e.pop("payoff_citation_before_setup", None)
+        # Preserve model-cited scenes separately; never expose them as
+        # confirmed payoff locations to existing readers.
+        e["payoff_scenes"] = None
+
+        if terms:
+            search_setup_scenes = model_setup or scene_numbers
+            for scene_num in search_setup_scenes:
+                ok, _ = _terms_in_scenes(terms, doc, [scene_num])
+                if ok:
+                    e["candidate_setup_scenes"].append(scene_num)
+            if not model_setup:
+                e["setup_citation_missing"] = True
+                if not e["candidate_setup_scenes"]:
+                    for scene_num in scene_numbers:
+                        ok, _ = _terms_in_scenes(terms, doc, [scene_num])
+                        if ok:
+                            e["candidate_setup_scenes"].append(scene_num)
+            elif not e["candidate_setup_scenes"]:
+                e["setup_ungrounded"] = True
+                for scene_num in scene_numbers:
+                    ok, _ = _terms_in_scenes(terms, doc, [scene_num])
+                    if ok:
+                        e["candidate_setup_scenes"].append(scene_num)
+
+            if not e["candidate_setup_scenes"]:
+                e["setup_ungrounded"] = True
+            elif not model_setup:
+                e["candidate_setup_scenes"] = e["candidate_setup_scenes"][:1]
+
+            if e["candidate_setup_scenes"]:
+                setup_after = max(e["candidate_setup_scenes"])
             else:
-                later = [s.scene_number for s in (doc.scenes or [])]
-            ok, at = _terms_in_scenes(terms, doc, later)
-            if ok:
-                old_status = e.get("status")
-                e["status"] = "paid"
-                e["payoff_scenes"] = [at]
-                e["verified"] = True
-                e["verify_note"] = f"setup terms recur in scene {at} — paid, not {old_status}"
-            else:
-                e["verified"] = False
-                e["verify_note"] = "no later recurrence found (kept: absence proves nothing)"
+                numeric_refs = [n for n in model_setup if isinstance(n, int) and not isinstance(n, bool)]
+                setup_after = max(numeric_refs) if numeric_refs else 0
+            later_scenes = [n for n in scene_numbers if n > setup_after]
+            for scene_num in later_scenes:
+                ok, _ = _terms_in_scenes(terms, doc, [scene_num])
+                if ok:
+                    e["candidate_recurrence_scenes"].append(scene_num)
+
+            if model_payoff and any(
+                isinstance(n, int) and not isinstance(n, bool) and n <= setup_after
+                for n in model_payoff
+            ):
+                e["payoff_citation_before_setup"] = True
+
+        if e.get("setup_ungrounded"):
+            reason = "the cited setup location was not grounded; the payoff assessment remains a model proposal"
+        elif e.get("candidate_recurrence_scenes"):
+            scenes = ", ".join(str(n) for n in e["candidate_recurrence_scenes"])
+            reason = (
+                f"setup terms also recur in scene(s) {scenes}; this is a candidate recurrence, "
+                "not confirmation of narrative payoff"
+            )
         else:
-            e["verified"] = False
-            e["verify_note"] = "status outside the adjudicated set, kept as written"
+            reason = (
+                "no later textual recurrence was located; absence of terms or a payoff citation "
+                "cannot establish that the setup is dangling or abandoned"
+            )
+        if e.get("payoff_citation_before_setup"):
+            reason += "; at least one model-cited payoff scene is at or before the setup"
+        if not terms:
+            reason = "the setup has no checkable content terms; the payoff assessment remains unverified"
+        e["verify_note"] = reason
+        e["status"] = "unverified"
+        e["verified"] = False
     return entries
