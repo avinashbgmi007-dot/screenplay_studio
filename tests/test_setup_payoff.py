@@ -93,10 +93,23 @@ def test_later_recurrence_is_only_a_candidate():
 
 
 def test_absence_does_not_prove_abandonment():
+    doc = _parse("""Title: T
+Author: T
+
+INT. ROOM - NIGHT
+
+A moonstone amulet rests on the table.
+
+CUT TO:
+
+INT. HALL - DAY
+
+He waits by the door.
+""")
     result = adjudicate_ledger([{
         "setup": "The moonstone amulet", "kind": "object",
         "setup_scenes": [1], "payoff_scenes": None,
-        "status": "abandoned", "note": "Never appears again."}], _parse())[0]
+        "status": "abandoned", "note": "Never appears again."}], doc)[0]
     assert result["status"] == "unverified"
     assert result["verified"] is False
     assert result["model_status"] == "abandoned"
